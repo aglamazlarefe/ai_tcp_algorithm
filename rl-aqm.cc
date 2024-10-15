@@ -11,9 +11,11 @@
 #include "ns3/ai-module.h"
 #include"ns3/queue-disc.h"
 
-#include "rl-aqm-env.h" // Kendi AQM ortam dosyanız
+#include"tubitak/adaptive-aqm-scheme/rl-aqm-env.h"    // Kendi AQM ortam dosyanız
 
 using namespace ns3;
+using namespace std;
+
 
 NS_LOG_COMPONENT_DEFINE("RLAqmSimulation");
 
