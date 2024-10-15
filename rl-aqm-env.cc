@@ -18,7 +18,7 @@ RLAqmEnv::~RLAqmEnv()
 }
 
 TypeId
-RLAqmEnv::GetTypeId(void)
+RLAqmEnv::GetTypeId()
 {
     static TypeId tid = TypeId ("ns3::RLAqmEnv")
         .SetParent<OpenGymEnv> ()
