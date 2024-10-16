@@ -6,9 +6,6 @@ cmake_minimum_required(VERSION 3.10)
 # Proje adı
 project(rl-aqm CXX)
 
-# ns-3 ve gerekli modülleri bul
-find_package(ns3 REQUIRED COMPONENTS core network internet point-to-point applications traffic-control flow-monitor ai)
-
 # Kaynak dosyaları
 set(source_files
     rl-aqm-env.cc
@@ -35,17 +32,18 @@ build_lib_example(
                       ${libai}
 )
 
-# Python binding modülü oluştur
-set(py_source_files
-    rl-aqm-py.cc
-)
+# Python binding modülü oluştur (isteğe bağlı)
+if(${ENABLE_PYTHON_BINDINGS})
+    set(py_source_files
+        rl-aqm-py.cc
+    )
 
-build_lib_example_python_bindings(
-    NAME rl_aqm
-    SOURCE_FILES ${py_source_files}
-    LIBRARIES_TO_LINK ${libai}
-    PYTHON_DEPENDENCIES_LIST requirements.txt
-)
+    build_lib_example_python_bindings(
+        NAME rl_aqm
+        SOURCE_FILES ${py_source_files}
+        LIBRARIES_TO_LINK ${libai}
+    )
 
-# Python binding'i C++ kütüphanesiyle birlikte derle
-add_dependencies(rl-aqm rl_aqm_py)
+    # Python binding'i C++ kütüphanesiyle birlikte derle
+    add_dependencies(rl-aqm rl_aqm_py)
+endif()

@@ -1,4 +1,3 @@
-
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/internet-module.h"
@@ -9,13 +8,12 @@
 #include "ns3/ipv4-global-routing-helper.h"
 #include "ns3/point-to-point-layout-module.h"
 #include "ns3/ai-module.h"
-#include"ns3/queue-disc.h"
+#include "ns3/queue-disc.h"
 
-#include"tubitak/adaptive-aqm-scheme/rl-aqm-env.h"    // Kendi AQM ortam dosyanız
+#include "rl-aqm-env.h"    // Kendi AQM ortam dosyanız
 
 using namespace ns3;
 using namespace std;
-
 
 NS_LOG_COMPONENT_DEFINE("RLAqmSimulation");
 
@@ -38,16 +36,16 @@ public:
     ~RLAqmQueueDisc () override;
 
     // Kuyruk disiplini metodları
-    bool DoEnqueue(Ptr<QueueDiscItem> item) override;  // Dönüş tipi düzeltildi
-    Ptr<QueueDiscItem> DoDequeue(void) override;  // Dönüş tipi doğru
-    
+    bool DoEnqueue(Ptr<QueueDiscItem> item) override;
+    Ptr<QueueDiscItem> DoDequeue(void) override;
+    Ptr<QueueDiscItem> DoPeek(void) override; // const kaldırıldı
+    bool DoDrop(Ptr<QueueDiscItem> item) override; // const kaldırıldı
 
-    Ptr<QueueDiscItem> DoPeek(void) const ;
-    void DoDrop(Ptr<const QueueDiscItem> item) ; // Dönüş tipi doğru 
-    
     // ns3-ai entegrasyon metodları
     virtual void GetState (RLAqmEnv* env);
     virtual void SetAction (uint32_t action);
+    bool CheckConfig() override { return true; }
+    void InitializeParams() override {}
 
 private:
     Ptr<RLAqmEnv> m_env; // Bu doğru tanımlama
@@ -60,8 +58,7 @@ RLAqmQueueDisc::GetTypeId (void)
     static TypeId tid = TypeId ("ns3::RLAqmQueueDisc")
         .SetParent<QueueDisc> ()
         .SetGroupName ("TrafficControl")
-        .AddConstructor<RLAqmQueueDisc> ()
-    ;
+        .AddConstructor<RLAqmQueueDisc> ();
     return tid;
 }
 
@@ -78,7 +75,6 @@ RLAqmQueueDisc::~RLAqmQueueDisc ()
 
 bool RLAqmQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
-    // Kuyruğa alma mantığı
     NS_LOG_FUNCTION (this << item);
     return true; // Öğeyi kuyruğa aldık
 }
@@ -87,61 +83,43 @@ Ptr<QueueDiscItem>
 RLAqmQueueDisc::DoDequeue(void)
 {
     NS_LOG_FUNCTION(this);
-
-    // Kuyruktan paketi çıkar (QueueDisc'in internal kuyruğunu kullanarak)
-    Ptr<QueueDiscItem> item = GetInternalQueue(0)->Dequeue();  // GetInternalQueue(0) ile 0. sıradaki kuyruğa erişilir
-
+    Ptr<QueueDiscItem> item = GetInternalQueue(0)->Dequeue();
     if (item)
     {
         return item; // Doğru dönüş
     }
-
     return nullptr; // Paket yoksa nullptr döndür
 }
-
 
 Ptr<QueueDiscItem>
-RLAqmQueueDisc::DoPeek(void) const
+RLAqmQueueDisc::DoPeek(void)
 {
     NS_LOG_FUNCTION(this);
-
-    // Kuyruğun başındaki öğeye bak (QueueDisc'in internal kuyruğunu kullanarak)
-    Ptr<QueueDiscItem> item = GetInternalQueue(0)->Peek();  // GetInternalQueue(0) ile ilk kuyruk elemanını kontrol ederiz
-
+    Ptr<QueueDiscItem> item = GetInternalQueue(0)->Peek();
     if (item)
     {
         return item; // Doğru dönüş
     }
-
     return nullptr; // Paket yoksa nullptr döndür
 }
 
-
-
-
-
-void
-RLAqmQueueDisc::DoDrop (Ptr<const QueueDiscItem> item)  
+bool RLAqmQueueDisc::DoDrop(Ptr<QueueDiscItem> item)
 {
-    // Kuyruktan çıkarma mantığı
-    NS_LOG_FUNCTION (this << item);
+    NS_LOG_FUNCTION(this << item);
+    // Düşürme mantığı
+    return true;
 }
 
-
-void
-RLAqmQueueDisc::GetState (RLAqmEnv* env)
+void RLAqmQueueDisc::GetState(RLAqmEnv* env)
 {
-    // ns3-ai ortamına durum bilgisi gönderin
-    NS_LOG_FUNCTION (this << env);
+    NS_LOG_FUNCTION(this << env);
     m_env = env;
 }
 
-void
-RLAqmQueueDisc::SetAction (uint32_t action)
+void RLAqmQueueDisc::SetAction(uint32_t action)
 {
-    // ns3-ai ortamından eylem bilgisi alın
-    NS_LOG_FUNCTION (this << action);
-    // Eylemi uygulayın
+    NS_LOG_FUNCTION(this << action);
+    // Eylemi uygulama mantığını buraya ekleyin
 }
 
 int main (int argc, char *argv[])
@@ -163,17 +141,15 @@ int main (int argc, char *argv[])
     bottleneckLink.SetDeviceAttribute("DataRate", StringValue(std::to_string(bottleneckBandwidth) + "Mbps"));
     bottleneckLink.SetChannelAttribute("Delay", StringValue("50ms"));
 
-    // PointToPointDumbbellHelper sadece topolojiyi tanımlar, cihazları kurmaz
     PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
 
     // Ağa bağlı cihazları oluşturma
-    NetDeviceContainer sourceDevices = accessLink.Install(dumbbell.GetLeft());  // Tüm sol (kaynak) düğümlerine cihaz kurar
-    NetDeviceContainer sinkDevices = accessLink.Install(dumbbell.GetRight());   // Tüm sağ (hedef) düğümlerine cihaz kurar
+    NetDeviceContainer sourceDevices = accessLink.Install(dumbbell.GetLeft());
+    NetDeviceContainer sinkDevices = accessLink.Install(dumbbell.GetRight());
 
-    // Bottleneck (darboğaz) bağlantısı için cihazları kurun
+    // Bottleneck cihazları kur
     NetDeviceContainer bottleneckDevices = bottleneckLink.Install(dumbbell.GetLeft()->GetDevice(0), dumbbell.GetRight()->GetDevice(0));
 
-    
     // IP adresleme
     Ipv4AddressHelper ipv4;
     ipv4.SetBase ("10.1.1.0", "255.255.255.0");
@@ -187,37 +163,34 @@ int main (int argc, char *argv[])
     for (uint32_t i = 0; i < nSources; ++i)
     {
         BulkSendHelper ftp ("ns3::TcpSocketFactory",
-                            InetSocketAddress (Ipv4Address ("10.1.1.1"), 9));
+                            InetSocketAddress (dumbbell.GetRightIpv4Address(i), 9));
         ftp.SetAttribute ("MaxBytes", UintegerValue (1000000));
-        sourceApps.Add (ftp.Install (left.Get (i))); // Burayı düzelt
+        sourceApps.Add (ftp.Install (dumbbell.GetLeft(i)));
     }
 
     for (uint32_t i = 0; i < nSinks; ++i)
     {
         PacketSinkHelper sink ("ns3::TcpSocketFactory",
-                              InetSocketAddress (Ipv4Address ("10.1.1.2"), 9));
-        sinkApps.Add (sink.Install (right.Get (i))); // Burayı düzelt
+                              InetSocketAddress (Ipv4Address::GetAny(), 9));
+        sinkApps.Add (sink.Install (dumbbell.GetRight(i)));
     }
 
     // AQM (RLAqmQueueDisc) kurulumunu yapma
     TrafficControlHelper tcHelper;
     tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
-    tcHelper.Install(bottleneckDevices);  // Bottleneck'deki cihazlara AQM kurulumu
+    tcHelper.Install(bottleneckDevices);
 
-    // FlowMonitor kurulumu (cihazlara kurulan monitör)
+    // FlowMonitor kurulumu
     FlowMonitorHelper flowmon;
-    Ptr<FlowMonitor> monitor = flowmon.Install(dumbbell.GetLeft());  // Sol (kaynak) düğümlerine FlowMonitor kurar
-    Ptr<FlowMonitor> monitor2 = flowmon.Install(dumbbell.GetRight());  // Sağ (hedef) düğümlerine FlowMonitor kurar
-
-
-
+    Ptr<FlowMonitor> monitor = flowmon.Install(dumbbell.GetLeft());
+    Ptr<FlowMonitor> monitor2 = flowmon.Install(dumbbell.GetRight());
 
     // Simülasyonu çalıştırma
     Simulator::Stop (Seconds (simulationTime));
     Simulator::Run ();
 
     // Simülasyon sonuçlarını analiz edin
-    monitor->CheckForLostPackets ();
+    monitor->CheckForLostPackets();
 
     return 0;
 }
