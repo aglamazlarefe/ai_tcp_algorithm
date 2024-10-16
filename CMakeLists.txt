@@ -1,34 +1,51 @@
+# CMakeLists.txt for RL-AQM example
+
+# Minimum CMake sürümü
 cmake_minimum_required(VERSION 3.10)
 
 # Proje adı
-project(RLAQM-Simulation)
+project(rl-aqm CXX)
 
-# Gerekli paketler
-find_package(NS3 REQUIRED)
-find_package(OpenGymAi REQUIRED)
+# ns-3 ve gerekli modülleri bul
+find_package(ns3 REQUIRED COMPONENTS core network internet point-to-point applications traffic-control flow-monitor ai)
 
-# C++ standardı
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-# Kütüphaneler ve dizinler
-include_directories(${NS3_INCLUDE_DIRS} ${OpenGymAi_INCLUDE_DIRS})
-
-link_directories(${NS3_LIBRARY_DIRS} ${OpenGymAi_LIBRARY_DIRS})
-
-# Kaynak dosyalar
-set(SOURCES
+# Kaynak dosyaları
+set(source_files
     rl-aqm-env.cc
     rl-aqm.cc
 )
 
-# Çıktı dosyası
-add_executable(RLAqmSimulation ${SOURCES})
+# Başlık dosyaları
+set(header_files
+    rl-aqm-env.h
+)
 
-# Kütüphanelerle bağlantı
-target_link_libraries(RLAqmSimulation ${NS3_LIBRARIES} ${OpenGymAi_LIBRARIES})
+# Çalıştırılabilir dosya oluştur
+build_lib_example(
+    NAME rl-aqm
+    SOURCE_FILES ${source_files}
+    HEADER_FILES ${header_files}
+    LIBRARIES_TO_LINK ${libcore}
+                      ${libnetwork}
+                      ${libinternet}
+                      ${libpoint-to-point}
+                      ${libapplications}
+                      ${libtraffic-control}
+                      ${libflow-monitor}
+                      ${libai}
+)
 
-# Debug log ayarı
-add_definitions(-DNS3_LOG_ENABLE)
+# Python binding modülü oluştur
+set(py_source_files
+    rl-aqm-py.cc
+)
 
+build_lib_example_python_bindings(
+    NAME rl_aqm
+    SOURCE_FILES ${py_source_files}
+    LIBRARIES_TO_LINK ${libai}
+    PYTHON_DEPENDENCIES_LIST requirements.txt
+)
 
+# Python binding'i C++ kütüphanesiyle birlikte derle
+add_dependencies(rl-aqm rl_aqm_py)
