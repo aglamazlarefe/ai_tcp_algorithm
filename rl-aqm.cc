@@ -117,6 +117,21 @@ void RLAqmQueueDisc::SetAction(uint32_t action)
     // Eylemi uygulama mantığını buraya ekleyin
 }
 
+
+
+bool RLAqmQueueDisc::CheckConfig (void)
+{
+    NS_LOG_FUNCTION (this);
+    // Yapılandırma kontrolü için gerekli işlemleri burada yapabilirsiniz.
+    return true;
+}
+
+void RLAqmQueueDisc::InitializeParams (void)
+{
+    NS_LOG_FUNCTION (this);
+    // Gerekli başlangıç parametrelerini burada ayarlayın.
+}
+
 int main (int argc, char *argv[])
 {
     // Komut satırı argümanlarını işleyin
