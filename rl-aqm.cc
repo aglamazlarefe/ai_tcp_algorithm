@@ -9,6 +9,8 @@
 #include "ns3/point-to-point-layout-module.h"
 #include "ns3/ai-module.h"
 #include "ns3/queue-disc.h"
+#include "ns3/internet-stack-helper.h"
+
 
 #include "rl-aqm-env.h"    // Kendi AQM ortam dosyanız
 
@@ -151,25 +153,42 @@ int main (int argc, char *argv[])
     bottleneckLink.SetDeviceAttribute("DataRate", StringValue(std::to_string(bottleneckBandwidth) + "Mbps"));
     bottleneckLink.SetChannelAttribute("Delay", StringValue("50ms"));
 
+   
+
     PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
 
-    // Ağa bağlı cihazları oluşturma
-    NetDeviceContainer sourceDevices = accessLink.Install(dumbbell.GetLeft());
-    NetDeviceContainer sinkDevices = accessLink.Install(dumbbell.GetRight());
+    InternetStackHelper stack;
+    stack.InstallAll();
 
-    // Bottleneck cihazları kur
     Ptr<Node> leftRouter = dumbbell.GetLeft();
     Ptr<Node> rightRouter = dumbbell.GetRight();
-    NetDeviceContainer bottleneckDevices = bottleneckLink.Install(leftRouter, rightRouter);
 
+    // Bottleneck cihazları kur
+    NetDeviceContainer bottleneckDevices;
+    bottleneckDevices.Add(dumbbell.GetLeft()->GetDevice(nSources));
+    bottleneckDevices.Add(dumbbell.GetRight()->GetDevice(nSinks));
 
-    // IP adresleme
     Ipv4AddressHelper ipv4;
     ipv4.SetBase ("10.1.1.0", "255.255.255.0");
-    Ipv4InterfaceContainer sourceInterfaces, sinkInterfaces, bottleneckInterfaces;
-    ipv4.Assign (sourceDevices);
-    ipv4.Assign (sinkDevices);
-    ipv4.Assign (bottleneckDevices);
+    Ipv4InterfaceContainer leftInterfaces;
+    for (uint32_t i = 0; i < nSources; ++i)
+    {
+        NetDeviceContainer leftDevice = dumbbell.GetLeft(i)->GetDevice(0);
+        Ipv4InterfaceContainer ic = ipv4.Assign(leftDevice);
+        leftInterfaces.Add(ic);
+    }
+
+    ipv4.SetBase ("10.2.1.0", "255.255.255.0");
+    Ipv4InterfaceContainer rightInterfaces;
+    for (uint32_t i = 0; i < nSinks; ++i)
+    {
+        NetDeviceContainer rightDevice = dumbbell.GetRight(i)->GetDevice(0);
+        Ipv4InterfaceContainer ic = ipv4.Assign(rightDevice);
+        rightInterfaces.Add(ic);
+    }
+
+    ipv4.SetBase ("10.3.1.0", "255.255.255.0");
+    Ipv4InterfaceContainer routerInterfaces = ipv4.Assign(bottleneckDevices);
 
     // Trafik modeli oluşturma
     ApplicationContainer sourceApps, sinkApps;

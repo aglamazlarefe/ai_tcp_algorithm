@@ -109,7 +109,7 @@ class RlAqmAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
 # NS-3 AI Gym Ortamını başlat   
-env= gym.make("ns3ai_gym_env/Ns3-v0", targetName="RL_AQM",
+env= gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
                ns3Path="../../../../../", )  # Ns3AIGymEnv yerine Ns3Env kullanın
 state_size = env.observation_space
 action_size = env.action_space
