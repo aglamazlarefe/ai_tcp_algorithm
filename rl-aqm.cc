@@ -27,7 +27,6 @@ static const uint32_t mtuBytes = 1500;          // MTU boyutu (bayt)
 static const double simulationTime = 120.0;     // Simülasyon süresi (saniye)
 static const double flowStartTime = 0.1;      // Akış başlangıç ​​zamanı (saniye)
 
-// AQM sınıfı 
 class RLAqmQueueDisc : public QueueDisc
 {
 public:
@@ -38,17 +37,17 @@ public:
     // Kuyruk disiplini metodları
     bool DoEnqueue(Ptr<QueueDiscItem> item) override;
     Ptr<QueueDiscItem> DoDequeue(void) override;
-    Ptr<QueueDiscItem> DoPeek(void) override; // const kaldırıldı
-    bool DoDrop(Ptr<QueueDiscItem> item) override; // const kaldırıldı
+    Ptr<const QueueDiscItem> DoPeek(void) const ; // const eklendi ve dönüş türü değiştirildi
+    bool CheckConfig (void) override;
+    void InitializeParams (void) override;
+    bool DoDrop(Ptr<QueueDiscItem> item) ;
 
     // ns3-ai entegrasyon metodları
     virtual void GetState (RLAqmEnv* env);
     virtual void SetAction (uint32_t action);
-    bool CheckConfig() override { return true; }
-    void InitializeParams() override {}
 
 private:
-    Ptr<RLAqmEnv> m_env; // Bu doğru tanımlama
+    Ptr<RLAqmEnv> m_env;
 };
 
 // RLAqmQueueDisc metodlarını tanımlayın
@@ -91,16 +90,12 @@ RLAqmQueueDisc::DoDequeue(void)
     return nullptr; // Paket yoksa nullptr döndür
 }
 
-Ptr<QueueDiscItem>
-RLAqmQueueDisc::DoPeek(void)
+Ptr<const QueueDiscItem>
+RLAqmQueueDisc::DoPeek(void) const
 {
     NS_LOG_FUNCTION(this);
-    Ptr<QueueDiscItem> item = GetInternalQueue(0)->Peek();
-    if (item)
-    {
-        return item; // Doğru dönüş
-    }
-    return nullptr; // Paket yoksa nullptr döndür
+    Ptr<const QueueDiscItem> item = GetInternalQueue(0)->Peek();
+    return item;
 }
 
 bool RLAqmQueueDisc::DoDrop(Ptr<QueueDiscItem> item)
@@ -148,7 +143,10 @@ int main (int argc, char *argv[])
     NetDeviceContainer sinkDevices = accessLink.Install(dumbbell.GetRight());
 
     // Bottleneck cihazları kur
-    NetDeviceContainer bottleneckDevices = bottleneckLink.Install(dumbbell.GetLeft()->GetDevice(0), dumbbell.GetRight()->GetDevice(0));
+    Ptr<Node> leftRouter = dumbbell.GetLeft();
+    Ptr<Node> rightRouter = dumbbell.GetRight();
+    NetDeviceContainer bottleneckDevices = bottleneckLink.Install(leftRouter, rightRouter);
+
 
     // IP adresleme
     Ipv4AddressHelper ipv4;
