@@ -38,8 +38,8 @@ public:
 
     // Kuyruk disiplini metodları
     bool DoEnqueue(Ptr<QueueDiscItem> item) override;
-    Ptr<QueueDiscItem> DoDequeue(void) override;
-    Ptr<const QueueDiscItem> DoPeek(void) const ; // const eklendi ve dönüş türü değiştirildi
+    Ptr<QueueDiscItem> DoDequeue(void)  override;
+    Ptr<const QueueDiscItem> DoPeek(void) const; // const eklendi ve dönüş türü değiştirildi
     bool CheckConfig (void) override;
     void InitializeParams (void) override;
     bool DoDrop(Ptr<QueueDiscItem> item) ;
@@ -77,8 +77,10 @@ RLAqmQueueDisc::~RLAqmQueueDisc ()
 bool RLAqmQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
 {
     NS_LOG_FUNCTION (this << item);
-    return true; // Öğeyi kuyruğa aldık
+    bool succeeded = GetInternalQueue(0)->Enqueue(item);  // Öğeyi sıraya ekleyin
+    return succeeded;  // Öğeyi başarıyla sıraya ekleyip eklemediğinizi kontrol edin
 }
+
 
 Ptr<QueueDiscItem>
 RLAqmQueueDisc::DoDequeue(void)
@@ -93,7 +95,7 @@ RLAqmQueueDisc::DoDequeue(void)
 }
 
 Ptr<const QueueDiscItem>
-RLAqmQueueDisc::DoPeek(void) const
+RLAqmQueueDisc::DoPeek(void) const 
 {
     NS_LOG_FUNCTION(this);
     Ptr<const QueueDiscItem> item = GetInternalQueue(0)->Peek();
@@ -155,7 +157,9 @@ int main (int argc, char *argv[])
 
    
 
-    PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
+       PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
+    std::cout << "Left router node ID: " << dumbbell.GetLeft()->GetId() << std::endl;
+    std::cout << "Right router node ID: " << dumbbell.GetRight()->GetId() << std::endl;
 
     InternetStackHelper stack;
     stack.InstallAll();
@@ -167,39 +171,37 @@ int main (int argc, char *argv[])
     NetDeviceContainer bottleneckDevices;
     bottleneckDevices.Add(dumbbell.GetLeft()->GetDevice(nSources));
     bottleneckDevices.Add(dumbbell.GetRight()->GetDevice(nSinks));
-
+    
+    // IP adreslerini atayın
     Ipv4AddressHelper ipv4;
     ipv4.SetBase ("10.1.1.0", "255.255.255.0");
     Ipv4InterfaceContainer leftInterfaces;
     for (uint32_t i = 0; i < nSources; ++i)
     {
-        NetDeviceContainer leftDevice = dumbbell.GetLeft(i)->GetDevice(0);
-        Ipv4InterfaceContainer ic = ipv4.Assign(leftDevice);
-        leftInterfaces.Add(ic);
+        leftInterfaces.Add(ipv4.Assign(dumbbell.GetLeft(i)->GetDevice(0)));
     }
 
     ipv4.SetBase ("10.2.1.0", "255.255.255.0");
     Ipv4InterfaceContainer rightInterfaces;
     for (uint32_t i = 0; i < nSinks; ++i)
     {
-        NetDeviceContainer rightDevice = dumbbell.GetRight(i)->GetDevice(0);
-        Ipv4InterfaceContainer ic = ipv4.Assign(rightDevice);
-        rightInterfaces.Add(ic);
+        rightInterfaces.Add(ipv4.Assign(dumbbell.GetRight(i)->GetDevice(0)));
     }
 
     ipv4.SetBase ("10.3.1.0", "255.255.255.0");
     Ipv4InterfaceContainer routerInterfaces = ipv4.Assign(bottleneckDevices);
 
-    // Trafik modeli oluşturma
+    
+
     ApplicationContainer sourceApps, sinkApps;
     for (uint32_t i = 0; i < nSources; ++i)
     {
         BulkSendHelper ftp ("ns3::TcpSocketFactory",
-                            InetSocketAddress (dumbbell.GetRightIpv4Address(i), 9));
+                            InetSocketAddress (rightInterfaces.GetAddress(i), 9));
         ftp.SetAttribute ("MaxBytes", UintegerValue (1000000));
         sourceApps.Add (ftp.Install (dumbbell.GetLeft(i)));
     }
-
+    
     for (uint32_t i = 0; i < nSinks; ++i)
     {
         PacketSinkHelper sink ("ns3::TcpSocketFactory",

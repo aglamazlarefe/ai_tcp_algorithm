@@ -10,10 +10,12 @@ namespace ns3 {
 NS_LOG_COMPONENT_DEFINE ("RLAqmEnv");
 
 RLAqmEnv::RLAqmEnv()
+  : m_queueDelay(0.0), m_linkUtilization(0.0), m_dropProbability(0.0), m_reward(0.0)
 {
     NS_LOG_FUNCTION (this);
     SetOpenGymInterface(OpenGymInterface::Get());
 }
+
 
 RLAqmEnv::~RLAqmEnv()
 {
