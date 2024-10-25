@@ -4,6 +4,7 @@
 #include "ns3/core-module.h"
 #include "ns3/ai-module.h"
 
+ 
 namespace ns3 {
 
 /**
@@ -12,10 +13,10 @@ namespace ns3 {
 class RLAqmEnv : public OpenGymEnv
 {
 public:
+    static TypeId GetTypeId(void);
     RLAqmEnv();
     virtual ~RLAqmEnv() override;
 
-    static TypeId GetTypeId(void);
 
     // OpenGymEnv arayüz metodları
     virtual Ptr<OpenGymSpace> GetActionSpace() override;

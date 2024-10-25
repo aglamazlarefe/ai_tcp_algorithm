@@ -29,6 +29,11 @@ static const uint32_t mtuBytes = 1500;          // MTU boyutu (bayt)
 static const double simulationTime = 120.0;     // Simülasyon süresi (saniye)
 static const double flowStartTime = 0.1;      // Akış başlangıç ​​zamanı (saniye)
 
+
+
+//NS_OBJECT_ENSURE_REGISTERED(RLAqmQueueDisc);
+
+
 class RLAqmQueueDisc : public QueueDisc
 {
 public:
@@ -80,6 +85,8 @@ bool RLAqmQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
     bool succeeded = GetInternalQueue(0)->Enqueue(item);  // Öğeyi sıraya ekleyin
     return succeeded;  // Öğeyi başarıyla sıraya ekleyip eklemediğinizi kontrol edin
 }
+
+NS_OBJECT_ENSURE_REGISTERED(RLAqmQueueDisc);
 
 
 Ptr<QueueDiscItem>
@@ -138,6 +145,9 @@ void RLAqmQueueDisc::InitializeParams (void)
 
 int main (int argc, char *argv[])
 {
+    
+    
+    
     // Komut satırı argümanlarını işleyin
     CommandLine cmd;
     cmd.Parse (argc, argv);
@@ -211,6 +221,7 @@ int main (int argc, char *argv[])
 
     // AQM (RLAqmQueueDisc) kurulumunu yapma
     TrafficControlHelper tcHelper;
+    tcHelper.Uninstall(bottleneckDevices);
     tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
     tcHelper.Install(bottleneckDevices);
 

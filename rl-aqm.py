@@ -110,7 +110,7 @@ class RlAqmAgent:
 
 # NS-3 AI Gym Ortamını başlat   
 env= gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
-               ns3Path="../../../../../", )  # Ns3AIGymEnv yerine Ns3Env kullanın
+               ns3Path="/home/aglamazlarefe/ns-3-dev", )  # Ns3AIGymEnv yerine Ns3Env kullanın
 state_size = env.observation_space
 action_size = env.action_space
 

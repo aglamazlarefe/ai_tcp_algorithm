@@ -1,1 +1,4 @@
 ./ns3 build rl-aqm
+gdb --args build/home/aglamazlarefe/ns-3-dev/contrib/ai/examples/adaptive-aqm-scheme/ns3.42-rl-aqm-debug
+(gdb) run
+bt
