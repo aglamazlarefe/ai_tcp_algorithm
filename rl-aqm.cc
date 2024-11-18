@@ -167,7 +167,7 @@ int main (int argc, char *argv[])
 
    
 
-       PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
+    PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
     std::cout << "Left router node ID: " << dumbbell.GetLeft()->GetId() << std::endl;
     std::cout << "Right router node ID: " << dumbbell.GetRight()->GetId() << std::endl;
 
@@ -236,6 +236,7 @@ int main (int argc, char *argv[])
 
     // Simülasyon sonuçlarını analiz edin
     monitor->CheckForLostPackets();
+    monitor->SerializeToXmlFile("flow-monitor.xml", true, true);
 
     return 0;
 }

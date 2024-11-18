@@ -109,11 +109,13 @@ class RlAqmAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
 # NS-3 AI Gym Ortamını başlat   
+#//TODO: c++ python arası sıkıntı düzeltilcek 
 env= gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
                ns3Path="/home/aglamazlarefe/ns-3-dev", )  # Ns3AIGymEnv yerine Ns3Env kullanın
 state_size = env.observation_space
+print(state_size)
 action_size = env.action_space
-
+print(action_size)
 # RL-AQM Ajanını başlat
 agent = RlAqmAgent(state_size, action_size)
 

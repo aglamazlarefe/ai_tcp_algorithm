@@ -20,7 +20,7 @@ public:
 
     // OpenGymEnv arayüz metodları
     virtual Ptr<OpenGymSpace> GetActionSpace() override;
-    virtual Ptr<OpenGymSpace> GetObservationSpace() override;
+    virtual Ptr<OpenGymSpace> GeQtObservationSpace() override;
     virtual bool GetGameOver() override;
     virtual Ptr<OpenGymDataContainer> GetObservation() override;
     virtual float GetReward() override;
