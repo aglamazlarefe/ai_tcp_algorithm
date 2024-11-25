@@ -1,3 +1,4 @@
+import logging
 import ns3ai_gym_env
 import gymnasium as gym
 import sys
@@ -10,9 +11,21 @@ import random
 from collections import namedtuple, deque
 
 
+
+
+
+# Logging yapılandırması
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+logging.info("Program başlatıldı.")
+
+
 # Deneyim (state, action, next_state, reward)
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
+
+
+
 
 
 # Deneyimleri saklamak için Replay Belleği
@@ -108,27 +121,47 @@ class RlAqmAgent:
     def update_target_net(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-# NS-3 AI Gym Ortamını başlat   
 #//TODO: c++ python arası sıkıntı düzeltilcek 
-env= gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
-               ns3Path="/home/aglamazlarefe/ns-3-dev", )  # Ns3AIGymEnv yerine Ns3Env kullanın
+
+# NS-3 AI Gym Ortamını başlat   
+try:
+    logging.info("NS-3 AI Gym ortamı başlatılıyor...")
+    env = gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
+                   ns3Path="/home/aglamazlarefe/ns-allinone-3.43/ns-3.43")
+    logging.info(f"Ortam başarıyla oluşturuldu: {env}")
+except Exception as e:
+    logging.error("NS-3 ortamı başlatılırken bir hata oluştu.", exc_info=True)
+
+
+# Ortamın özelliklerini yazdır
+try:
+    logging.debug(f"Env'in observation space: {env.observation_space}")
+    logging.debug(f"Env'in action space: {env.action_space}")
+except Exception as e:
+    logging.error("Observation ve action space alınırken hata oluştu.", exc_info=True)
+
 state_size = env.observation_space
-print(state_size)
 action_size = env.action_space
-print(action_size)
+
+logging.info(f"State size: {state_size}, Action size: {action_size}")
+
 # RL-AQM Ajanını başlat
 agent = RlAqmAgent(state_size, action_size)
 
 # Eğitim döngüsü
 for episode in range(1000):
     state = env.reset()
+    logging.debug(f"Episode {episode+1} başladı. Başlangıç durumu: {state}")
+
     done = False
     rewards = 0.0
 
 
     while not done:
         action = agent.select_action(torch.tensor(state, device=agent.device, dtype=torch.float32))
+        logging.debug(f"Seçilen aksiyon: {action.item()}")
         next_state, reward, done, _,info  = env.step(action.item())
+        logging.debug(f"Alınan ödül: {reward}, Bir sonraki durum: {next_state}, Episode tamamlandı mı: {done}")
         rewards += float(reward)
         agent.memory.push(torch.tensor(state, device=agent.device, dtype=torch.float32),
                          action, torch.tensor(next_state, device=agent.device, dtype=torch.float32),
@@ -136,13 +169,17 @@ for episode in range(1000):
         state = next_state
         agent.optimize_model()
     agent.update_target_net()
-    print(f'Episode {episode+1}, Reward: {rewards:.2f}')
+    logging.info(f'Episode {episode+1}, Toplam ödül: {rewards:.2f}')
+
 
 # Test döngüsü
 state = env.reset()
 done = False
 while not done:
-    action = agent.select_action(torch.tensor(state, device=agent.device, dtype=torch.float32))
-    next_state, reward, done, _ , info = env.step(action.item())
-    state = next_state
-    print(f'State: {state}, Action: {action.item()}, Reward: {reward:.2f}')
+    try:
+        action = agent.select_action(torch.tensor(state, device=agent.device, dtype=torch.float32))
+        next_state, reward, done, _, info = env.step(action.item())
+        logging.debug(f"Test Durumu: {state}, Aksiyon: {action.item()}, Ödül: {reward:.2f}")
+        state = next_state
+    except Exception as e:
+        logging.error("Test sırasında bir hata oluştu.", exc_info=True)

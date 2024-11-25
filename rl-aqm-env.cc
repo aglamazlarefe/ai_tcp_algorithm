@@ -99,6 +99,8 @@ RLAqmEnv::ExecuteActions(Ptr<OpenGymDataContainer> action)
     NS_LOG_FUNCTION (this << action);
     Ptr<OpenGymDiscreteContainer> discreteAction = DynamicCast<OpenGymDiscreteContainer> (action);
     uint32_t actionValue = discreteAction->GetValue();
+    NS_LOG_INFO("Received action from Python: " << actionValue); // Log ekleme
+
     switch (actionValue)
     {
         case 0:
@@ -125,6 +127,7 @@ void
 RLAqmEnv::SetState(double queueDelay, double linkUtilization, double dropProbability)
 {
     NS_LOG_FUNCTION (this << queueDelay << linkUtilization << dropProbability);
+    NS_LOG_INFO("Providing observation to Python."); // Log ekleme
     m_queueDelay = queueDelay;
     m_linkUtilization = linkUtilization;
     m_dropProbability = dropProbability;
