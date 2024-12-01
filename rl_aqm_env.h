@@ -8,7 +8,7 @@
 namespace ns3 {
 
 /**
- * \brief RLAqmEnv sınıfı, AQM için bir OpenGym ortamını tanımlar.
+ *  \brief RLAqmEnv sınıfı, AQM için bir OpenGym ortamını tanımlar.
  */
 class RLAqmEnv : public OpenGymEnv
 {

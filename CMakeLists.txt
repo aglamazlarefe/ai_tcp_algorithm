@@ -8,13 +8,13 @@ project(rl-aqm CXX)
 
 # Kaynak dosyaları
 set(source_files
-    rl-aqm-env.cc
-    rl-aqm.cc
+    rl_aqm_env.cc
+    rl_aqm.cc
 )
 
 # Başlık dosyaları
 set(header_files
-    rl-aqm-env.h
+    rl_aqm_env.h
 )
 
 # Çalıştırılabilir dosya oluştur

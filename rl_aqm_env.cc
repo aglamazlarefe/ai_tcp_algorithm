@@ -1,7 +1,5 @@
-
-#include "rl-aqm-env.h"
+#include "rl_aqm_env.h"
 #include "ns3/log.h"
-
 
 using namespace std;
 
@@ -16,7 +14,6 @@ RLAqmEnv::RLAqmEnv()
     SetOpenGymInterface(OpenGymInterface::Get());
 }
 
-
 RLAqmEnv::~RLAqmEnv()
 {
     NS_LOG_FUNCTION (this);
@@ -28,8 +25,7 @@ RLAqmEnv::GetTypeId()
     static TypeId tid = TypeId ("ns3::RLAqmEnv")
         .SetParent<OpenGymEnv> ()
         .SetGroupName ("Ns3Ai")
-        .AddConstructor<RLAqmEnv> ()
-    ;
+        .AddConstructor<RLAqmEnv> ();
     return tid;
 }
 
@@ -46,12 +42,13 @@ Ptr<OpenGymSpace>
 RLAqmEnv::GetObservationSpace()
 {
     NS_LOG_FUNCTION (this);
+    
     uint32_t parameterNum = 3;
     float low = 0.0;
     float high = 1.0; // Normalleştirilmiş değerler
     std::vector<uint32_t> shape = { parameterNum, };
     std::string dtype = TypeNameGet<float>();
-
+    std::cout << "get observation spaces ";
     return CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
 }
 
