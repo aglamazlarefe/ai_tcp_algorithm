@@ -27,7 +27,7 @@
     static const std::string bottleneckBandwidth = "10Mbps";
     static const std::string accessDelay = "2ms";
     static const std::string bottleneckDelay = "10ms";
-    static const double simulationTime = 5.0; // Simulation time in seconds
+    static const double simulationTime =10.0; // Simulation time in seconds
 
 
 
@@ -142,9 +142,16 @@
      }
     }
 
+    void SimulatorCallback() {
+        NS_LOG_INFO("Simulator callback invoked.");
+        // Simülasyon sırasında OpenGym arayüzünü tetikleyin
+        OpenGymInterface::Get()->NotifyCurrentState();
+    }
 int main(int argc, char* argv[]) {
     // Log Level
         
+        LogComponentEnable("RLAqmEnv", LOG_LEVEL_ALL);
+
 
         NS_LOG_INFO("Creating nodes...");
         NodeContainer leftNodes, rightNodes, routers;
@@ -239,6 +246,8 @@ int main(int argc, char* argv[]) {
         std::cout << "flow monitor kuruldu\n ";
 
         // Simülasyonu çalıştırma
+        Simulator::Schedule(Seconds(1.0), &SimulatorCallback);
+
         NS_LOG_INFO("Starting simulation...");
         Simulator::Stop(Seconds(simulationTime));
         std::cout << "stop\n";

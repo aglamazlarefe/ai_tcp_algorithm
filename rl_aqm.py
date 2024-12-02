@@ -11,9 +11,6 @@ import random
 from collections import namedtuple, deque
 
 
-
-
-
 # Logging yapılandırması
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -23,9 +20,6 @@ logging.info("Program başlatıldı.")
 # Deneyim (state, action, next_state, reward)
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
-
-
-
 
 
 # Deneyimleri saklamak için Replay Belleği
@@ -77,7 +71,7 @@ class RlAqmAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
 
-        self.optimizer = optim.adam.Adam(self.policy_net.parameters())# optim.Adam yerine torch.optim.Adam kullanın
+        self.optimizer = optim.Adam(self.policy_net.parameters())
 
     def select_action(self, state): 
         sample = random.random()
@@ -117,19 +111,14 @@ class RlAqmAgent:
                 param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
 
-
     def update_target_net(self):
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-#//TODO: c++ python arası sıkıntı düzeltilcek 
 
 # NS-3 AI Gym Ortamını başlat  
-
-
 try:
     logging.info("NS-3 AI Gym ortamı başlatılıyor...")
-    env = gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
-                   ns3Path="/home/aglamazlarefe/ns-allinone-3.43/ns-3.43",)
+    env = gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm", ns3Path="/home/aglamazlarefe/ns-allinone-3.43/ns-3.43")
     logging.info(f"Ortam başarıyla oluşturuldu: {env}")
 except Exception as e:
     logging.error("NS-3 ortamı başlatılırken bir hata oluştu.", exc_info=True)
@@ -143,36 +132,40 @@ try:
 except Exception as e:
     logging.error("Observation ve action space alınırken hata oluştu.", exc_info=True)
 
-state_size = env.observation_space
-action_size = env.action_space
+state_size = env.observation_space.shape[0]
+action_size = env.action_space.n
 
 logging.info(f"State size: {state_size}, Action size: {action_size}")
 
 # RL-AQM Ajanını başlat
 agent = RlAqmAgent(state_size, action_size)
 
-# Eğitim döngüsü
+# Eğitim döngüsünde state ve action ile işlem yapma
 for episode in range(1000):
-    state = env.reset()
-    logging.debug(f"Episode {episode+1} başladı. Başlangıç durumu: {state}")
+    state = env.reset()  # environment'ı sıfırlayın
+    state = np.array(state)  # numpy array'e dönüştürün
+    print(f"Episode {episode + 1}, Initial state: {state}")
 
     done = False
     rewards = 0.0
 
-
     while not done:
         action = agent.select_action(torch.tensor(state, device=agent.device, dtype=torch.float32))
-        logging.debug(f"Seçilen aksiyon: {action.item()}")
-        next_state, reward, done, _,info  = env.step(action.item())
-        logging.debug(f"Alınan ödül: {reward}, Bir sonraki durum: {next_state}, Episode tamamlandı mı: {done}")
+        next_state, reward, done, _, info = env.step(action.item())
+        
+        # next_state'i numpy array'e dönüştürün
+        next_state = np.array(next_state)
+        print(f"Converted next_state: {next_state}")
+
         rewards += float(reward)
         agent.memory.push(torch.tensor(state, device=agent.device, dtype=torch.float32),
                          action, torch.tensor(next_state, device=agent.device, dtype=torch.float32),
                          torch.tensor([reward], device=agent.device, dtype=torch.float32))
+        
         state = next_state
         agent.optimize_model()
     agent.update_target_net()
-    logging.info(f'Episode {episode+1}, Toplam ödül: {rewards:.2f}')
+    logging.info(f'Episode {episode + 1}, Toplam ödül: {rewards:.2f}')
 
 
 # Test döngüsü
