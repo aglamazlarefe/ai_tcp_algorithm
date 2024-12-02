@@ -27,7 +27,7 @@
     static const std::string bottleneckBandwidth = "10Mbps";
     static const std::string accessDelay = "2ms";
     static const std::string bottleneckDelay = "10ms";
-    static const double simulationTime =10.0; // Simulation time in seconds
+    static const double simulationTime =50.0; // Simulation time in seconds
 
 
 
@@ -248,10 +248,9 @@ int main(int argc, char* argv[]) {
         // Simülasyonu çalıştırma
         Simulator::Schedule(Seconds(1.0), &SimulatorCallback);
 
+
         NS_LOG_INFO("Starting simulation...");
         Simulator::Stop(Seconds(simulationTime));
-        std::cout << "stop\n";
-
         Simulator::Run(); 
         NS_LOG_INFO("Simulation finished.");
         std::cout << "run simulation\n";

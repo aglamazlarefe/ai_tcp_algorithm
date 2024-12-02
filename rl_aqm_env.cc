@@ -7,13 +7,13 @@ NS_LOG_COMPONENT_DEFINE("RLAqmEnv");
 
 RLAqmEnv::RLAqmEnv()
     : m_queueDelay(0.0), m_linkUtilization(0.0), m_dropProbability(0.0), m_reward(0.0) {
-    NS_LOG_FUNCTION("set opengyminterface");
+    //NS_LOG_FUNCTION("set opengyminterface");
     SetOpenGymInterface(OpenGymInterface::Get());
 
 }
 
 RLAqmEnv::~RLAqmEnv() {
-    NS_LOG_FUNCTION(this);
+   // NS_LOG_FUNCTION(this);
 }
 
 TypeId RLAqmEnv::GetTypeId() {
@@ -67,7 +67,7 @@ float RLAqmEnv::GetReward() {
 }
 
 std::string RLAqmEnv::GetExtraInfo() {
-    NS_LOG_FUNCTION("get extra info");
+    //NS_LOG_FUNCTION("get extra info");
     return "";
 }
 
@@ -97,6 +97,7 @@ bool RLAqmEnv::ExecuteActions(Ptr<OpenGymDataContainer> action) {
             NS_LOG_ERROR("Invalid action value");
             return false;
     }
+    OpenGymInterface::Get()->NotifyCurrentState();
     return true;
 }
 
