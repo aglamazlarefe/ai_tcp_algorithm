@@ -29,7 +29,7 @@ RLAqmEnv::GetTypeId()
     return tid;
 }
 
-// Eylem uzayı: 5 ayrık eylem
+// Action space: 5 discrete actions
 Ptr<OpenGymSpace>
 RLAqmEnv::GetActionSpace()
 {
@@ -37,7 +37,7 @@ RLAqmEnv::GetActionSpace()
     return CreateObject<OpenGymDiscreteSpace> (5);
 }
 
-// Gözlem uzayı: 3 sürekli değişkenli kutu uzayı
+// Observation space: 3 continuous variables (queueDelay, linkUtilization, dropProbability)
 Ptr<OpenGymSpace>
 RLAqmEnv::GetObservationSpace()
 {
@@ -45,14 +45,14 @@ RLAqmEnv::GetObservationSpace()
     
     uint32_t parameterNum = 3;
     float low = 0.0;
-    float high = 1.0; // Normalleştirilmiş değerler
+    float high = 1.0; // Normalized values
     std::vector<uint32_t> shape = { parameterNum, };
     std::string dtype = TypeNameGet<float>();
-    std::cout << "get observation spaces ";
+    std::cout << "Creating observation space ";
     return CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
 }
 
-// Oyun sonu koşulu: Şimdilik yok
+// Game over condition: Currently none
 bool
 RLAqmEnv::GetGameOver()
 {
@@ -60,7 +60,7 @@ RLAqmEnv::GetGameOver()
     return false;
 }
 
-// Gözlemleri al: Durum değişkenlerini döndür
+// Get the observations: Return state variables
 Ptr <OpenGymDataContainer>
 RLAqmEnv::GetObservation()
 {
@@ -73,7 +73,7 @@ RLAqmEnv::GetObservation()
     return box;
 }
 
-// Ödülü hesapla
+// Calculate the reward
 float
 RLAqmEnv::GetReward()
 {
@@ -81,7 +81,7 @@ RLAqmEnv::GetReward()
     return m_reward;
 }
 
-// Ekstra bilgi: Şimdilik yok
+// Extra info: Currently none
 std::string
 RLAqmEnv::GetExtraInfo()
 {
@@ -89,14 +89,14 @@ RLAqmEnv::GetExtraInfo()
     return "";
 }
 
-// Eylemleri uygula: Bırakma olasılığını güncelle
+// Execute actions: Update drop probability
 bool
 RLAqmEnv::ExecuteActions(Ptr<OpenGymDataContainer> action)
 {
     NS_LOG_FUNCTION (this << action);
     Ptr<OpenGymDiscreteContainer> discreteAction = DynamicCast<OpenGymDiscreteContainer> (action);
     uint32_t actionValue = discreteAction->GetValue();
-    NS_LOG_INFO("Received action from Python: " << actionValue); // Log ekleme
+    NS_LOG_INFO("Received action from Python: " << actionValue); // Log added
 
     switch (actionValue)
     {
@@ -119,16 +119,16 @@ RLAqmEnv::ExecuteActions(Ptr<OpenGymDataContainer> action)
     return true;
 }
 
-// AQM'den durum bilgisi al
+// Get state information from AQM
 void
 RLAqmEnv::SetState(double queueDelay, double linkUtilization, double dropProbability)
 {
     NS_LOG_FUNCTION (this << queueDelay << linkUtilization << dropProbability);
-    NS_LOG_INFO("Providing observation to Python."); // Log ekleme
+    NS_LOG_INFO("Providing observation to Python."); // Log added
     m_queueDelay = queueDelay;
     m_linkUtilization = linkUtilization;
     m_dropProbability = dropProbability;
-    // Ödülü hesapla
+    // Calculate reward
     m_reward = (pow(linkUtilization, 2) - 0.5) + (2 / (1 + queueDelay / 5) - 1.5);
 }
 

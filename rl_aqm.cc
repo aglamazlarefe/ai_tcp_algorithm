@@ -27,7 +27,7 @@
     static const std::string bottleneckBandwidth = "10Mbps";
     static const std::string accessDelay = "2ms";
     static const std::string bottleneckDelay = "10ms";
-    static const double simulationTime = 120.0; // Simulation time in seconds
+    static const double simulationTime = 5.0; // Simulation time in seconds
 
 
 
@@ -144,8 +144,7 @@
 
 int main(int argc, char* argv[]) {
     // Log Level
-        LogComponentEnable("BulkSendApplication", LOG_LEVEL_INFO);
-        LogComponentEnable("PacketSink", LOG_LEVEL_INFO);
+        
 
         NS_LOG_INFO("Creating nodes...");
         NodeContainer leftNodes, rightNodes, routers;
@@ -216,12 +215,14 @@ int main(int argc, char* argv[]) {
             PacketSinkHelper sink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), 9));
             sinkApps.Add(sink.Install(rightNodes.Get(i)));
         }
-
+        /*
         sourceApps.Start(Seconds(1.0));
         sourceApps.Stop(Seconds(simulationTime));
 
         sinkApps.Start(Seconds(1.0));
         sinkApps.Stop(Seconds(simulationTime));
+        */
+        
 
         // AQM (RLAqmQueueDisc) kurulumunu yapma
         NS_LOG_INFO("Setting up AQM...");
@@ -244,7 +245,7 @@ int main(int argc, char* argv[]) {
 
         Simulator::Run(); 
         NS_LOG_INFO("Simulation finished.");
-        std::cout << "run simulation";
+        std::cout << "run simulation\n";
 
         // Simülasyon sonuçlarını analiz edin
         monitor->CheckForLostPackets();
@@ -252,7 +253,7 @@ int main(int argc, char* argv[]) {
 
 
         Simulator::Destroy();
-        std::cout << "destroy simulation";
+        std::cout << "destroy simulation\n";
 
 
         return 0;

@@ -123,11 +123,13 @@ class RlAqmAgent:
 
 #//TODO: c++ python arası sıkıntı düzeltilcek 
 
-# NS-3 AI Gym Ortamını başlat   
+# NS-3 AI Gym Ortamını başlat  
+
+
 try:
     logging.info("NS-3 AI Gym ortamı başlatılıyor...")
     env = gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm",
-                   ns3Path="/home/aglamazlarefe/ns-allinone-3.43/ns-3.43")
+                   ns3Path="/home/aglamazlarefe/ns-allinone-3.43/ns-3.43",)
     logging.info(f"Ortam başarıyla oluşturuldu: {env}")
 except Exception as e:
     logging.error("NS-3 ortamı başlatılırken bir hata oluştu.", exc_info=True)
@@ -135,6 +137,7 @@ except Exception as e:
 
 # Ortamın özelliklerini yazdır
 try:
+    print(env.observation_space)
     logging.debug(f"Env'in observation space: {env.observation_space}")
     logging.debug(f"Env'in action space: {env.action_space}")
 except Exception as e:
