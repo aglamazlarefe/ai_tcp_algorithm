@@ -45,6 +45,9 @@
         bool CheckConfig (void) override;
         void InitializeParams (void) override;
         bool DoDrop(Ptr<QueueDiscItem> item) ;
+        void RLAqmQueueDisc::SimulatorCallback();
+        double RLAqmQueueDisc::CalculateQueueDelay();
+        double RLAqmQueueDisc::CalculateLinkUtilization();
 
         // ns3-ai entegrasyon metodları
         virtual void GetState (RLAqmEnv* env);
@@ -52,6 +55,7 @@
 
     private:
         Ptr<RLAqmEnv> m_env;
+        double m_dropProbability;
     };
 
     // RLAqmQueueDisc metodlarını tanımlayın
@@ -76,29 +80,31 @@
         NS_LOG_FUNCTION (this);
     }
 
-    bool RLAqmQueueDisc::DoEnqueue (Ptr<QueueDiscItem> item)
-    {
-        NS_LOG_FUNCTION (this << item);
-        bool succeeded = GetInternalQueue(0)->Enqueue(item);  // Öğeyi sıraya ekleyin
-        return succeeded;  // Öğeyi başarıyla sıraya ekleyip eklemediğinizi kontrol edin
+    bool RLAqmQueueDisc::DoEnqueue(Ptr<QueueDiscItem> item) {
+        NS_LOG_FUNCTION(this << item);
+        bool succeeded = GetInternalQueue(0)->Enqueue(item);
+        if (succeeded) {
+            // Update state on enqueue
+            double queueDelay = CalculateQueueDelay(); 
+            double linkUtilization = CalculateLinkUtilization(); 
+            m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
+        }
+        return succeeded;
     }
 
     NS_OBJECT_ENSURE_REGISTERED(RLAqmQueueDisc);
 
-
-    Ptr<QueueDiscItem>
-    RLAqmQueueDisc::DoDequeue(void)
-    {
+    Ptr<QueueDiscItem> RLAqmQueueDisc::DoDequeue() {
         NS_LOG_FUNCTION(this);
-
         Ptr<QueueDiscItem> item = GetInternalQueue(0)->Dequeue();
-        if (item)
-        {
-            return item; // Doğru dönüş
+        if (item) {
+            // Update state on dequeue
+            double queueDelay = CalculateQueueDelay();
+            double linkUtilization = CalculateLinkUtilization();
+            m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
         }
-        return nullptr; // Paket yoksa nullptr döndür
+        return item;
     }
-
     Ptr<const QueueDiscItem>
     RLAqmQueueDisc::DoPeek(void) const 
     {
@@ -142,11 +148,75 @@
      }
     }
 
-    void SimulatorCallback() {
-        NS_LOG_INFO("Simulator callback invoked.");
-        // Simülasyon sırasında OpenGym arayüzünü tetikleyin
-        OpenGymInterface::Get()->NotifyCurrentState();
+
+    double RLAqmQueueDisc::CalculateQueueDelay() {
+        NS_LOG_FUNCTION(this);
+
+        // Get the current queue size in bytes
+        uint32_t currentQueueSize = GetInternalQueue(0)->GetNBytes();
+
+        // Retrieve the link bandwidth (e.g., bottleneck link bandwidth in bits per second)
+        DataRateValue dataRateValue;
+        GetAttribute("DataRate", dataRateValue);
+        DataRate linkBandwidth = dataRateValue.Get();
+
+        if (linkBandwidth.GetBitRate() == 0) {
+            NS_LOG_WARN("Link bandwidth is zero, queue delay cannot be calculated.");
+            return 0.0;
+        }
+
+        // Calculate queue delay in seconds
+        double queueDelay = static_cast<double>(currentQueueSize) * 8 / linkBandwidth.GetBitRate();
+        return queueDelay;
     }
+
+
+    double RLAqmQueueDisc::CalculateLinkUtilization() {
+        NS_LOG_FUNCTION(this);
+
+        // Retrieve the link bandwidth (e.g., bottleneck link bandwidth in bits per second)
+        DataRateValue dataRateValue;
+        GetAttribute("DataRate", dataRateValue);
+        DataRate linkBandwidth = dataRateValue.Get();
+
+        if (linkBandwidth.GetBitRate() == 0) {
+            NS_LOG_WARN("Link bandwidth is zero, utilization cannot be calculated.");
+            return 0.0;
+        }
+
+        // Get the transmitted bytes since the last observation
+        uint64_t transmittedBytes = GetInternalQueue(0)->GetTotalEnqueuedBytes();
+
+        // Calculate utilization (0-1)
+        double utilization = static_cast<double>(transmittedBytes * 8) / linkBandwidth.GetBitRate();
+        return utilization;
+    }
+
+
+
+
+
+
+
+    void RLAqmQueueDisc::SimulatorCallback() {
+        NS_LOG_INFO("Simulator callback invoked.");
+
+        // Calculate Queue Delay
+        double queueDelay = CalculateQueueDelay(); // Implement this function to compute queue delay.
+
+        // Calculate Link Utilization
+        double linkUtilization = CalculateLinkUtilization(); // Implement this function to compute utilization.
+
+        // Update environment state and notify
+        m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
+
+        // Notify OpenGym about the current state
+        OpenGymInterface::Get()->NotifyCurrentState();
+
+        // Schedule the next callback at 20 ms
+        Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, this);
+    }
+
 int main(int argc, char* argv[]) {
     // Log Level
         
@@ -246,7 +316,8 @@ int main(int argc, char* argv[]) {
         std::cout << "flow monitor kuruldu\n ";
 
         // Simülasyonu çalıştırma
-        Simulator::Schedule(Seconds(1.0), &SimulatorCallback);
+        Simulator::Schedule(Seconds(0.02), &RLAqmQueueDisc::SimulatorCallback, bottleneckDevices.Get(0));
+
 
 
         NS_LOG_INFO("Starting simulation...");
@@ -258,6 +329,7 @@ int main(int argc, char* argv[]) {
         // Simülasyon sonuçlarını analiz edin
         monitor->CheckForLostPackets();
         monitor->SerializeToXmlFile("flow-monitor.xml", true, true);
+
 
 
         Simulator::Destroy();

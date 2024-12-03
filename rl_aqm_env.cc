@@ -25,13 +25,13 @@ TypeId RLAqmEnv::GetTypeId() {
 }
 
 Ptr<OpenGymSpace> RLAqmEnv::GetActionSpace() {
-    NS_LOG_FUNCTION(this);
+    // NS_LOG_FUNCTION(this);
     // Discrete actions: {do nothing, increase/drop probabilities by 0.01 or 0.1}
     return CreateObject<OpenGymDiscreteSpace>(5);
 }
 
 Ptr<OpenGymSpace> RLAqmEnv::GetObservationSpace() {
-    NS_LOG_FUNCTION(this);
+   // NS_LOG_FUNCTION(this);
     std::cout << "getobservation\n";
     uint32_t parameterNum = 3; // [queueDelay, linkUtilization, dropProbability]
     float low = 0.0;
@@ -72,32 +72,68 @@ std::string RLAqmEnv::GetExtraInfo() {
 }
 
 bool RLAqmEnv::ExecuteActions(Ptr<OpenGymDataContainer> action) {
-    NS_LOG_INFO("ExecuteActions called.");
+    //NS_LOG_INFO("ExecuteActions called.");
+
+    // Aksiyonun geçerliliğini kontrol et
+    if (action == nullptr) {
+        NS_LOG_ERROR("Received null action!");
+        return false;
+    }
 
     Ptr<OpenGymDiscreteContainer> discreteAction = DynamicCast<OpenGymDiscreteContainer>(action);
+    if (discreteAction == nullptr) {
+        NS_LOG_ERROR("Failed to cast action to OpenGymDiscreteContainer.");
+        return false;
+    }
+
     uint32_t actionValue = discreteAction->GetValue();
     NS_LOG_INFO("Python'dan alınan aksiyon: " << actionValue);
 
+    // Geçersiz aksiyon kontrolü
+    if (actionValue >= 5) { // 0-4 aralığında olmalı
+        NS_LOG_ERROR("Invalid action value: " << actionValue);
+        return false;
+    }
+
+    // Aksiyon işleme
+    double oldDropProbability = m_dropProbability; // Önceki değeri saklayın
     switch (actionValue) {
         case 0: // Do nothing
+            NS_LOG_INFO("Action 0: No change to drop probability.");
             break;
         case 1: // Increase drop probability by 0.01
             m_dropProbability = std::min(1.0, m_dropProbability + 0.01);
+            NS_LOG_INFO("Action 1: Increased drop probability by 0.01.");
             break;
         case 2: // Decrease drop probability by 0.01
             m_dropProbability = std::max(0.0, m_dropProbability - 0.01);
+            NS_LOG_INFO("Action 2: Decreased drop probability by 0.01.");
             break;
         case 3: // Increase drop probability by 0.1
             m_dropProbability = std::min(1.0, m_dropProbability + 0.1);
+            NS_LOG_INFO("Action 3: Increased drop probability by 0.1.");
             break;
         case 4: // Decrease drop probability by 0.1
             m_dropProbability = std::max(0.0, m_dropProbability - 0.1);
+            NS_LOG_INFO("Action 4: Decreased drop probability by 0.1.");
             break;
         default:
-            NS_LOG_ERROR("Invalid action value");
+            NS_LOG_ERROR("Unhandled action value: " << actionValue);
             return false;
     }
+
+    // DropProbability güncellemelerini kontrol et
+    if (std::isnan(m_dropProbability) || std::isinf(m_dropProbability)) {
+        NS_LOG_ERROR("Invalid drop probability value after action: " << m_dropProbability);
+        m_dropProbability = oldDropProbability; // Eski değere geri dön
+        return false;
+    }
+
+    NS_LOG_INFO("Updated drop probability: " << m_dropProbability);
+
+    // Simülasyon durumunu bildirin
     OpenGymInterface::Get()->NotifyCurrentState();
+
     return true;
 }
 
@@ -107,9 +143,15 @@ void RLAqmEnv::SetState(double queueDelay, double linkUtilization, double dropPr
     m_linkUtilization = linkUtilization;
     m_dropProbability = dropProbability;
 
-    // Reward function: R = (U^2 - 0.5) + (2 / (1 + D/5) - 1.5)
+    // Reward function as per the paper
     m_reward = (pow(m_linkUtilization, 2) - 0.5) + (2 / (1 + m_queueDelay / 5) - 1.5);
-   
+    if (std::isnan(m_reward) || std::isinf(m_reward)) {
+        NS_LOG_ERROR("Invalid reward value: " << m_reward);
+        m_reward = 0.0;
+    }
+    NS_LOG_INFO("Reward calculated: " << m_reward);
 }
+
+
 
 }  // namespace ns3
