@@ -1,13 +1,141 @@
-Ensure Compatibility with ns3-ai
-    Verify that your custom RLAqmEnv class (not shown here) correctly interacts with Python and that it handles state-action exchanges without type mismatches.
+Bu hatayı çözmek için aşağıdaki değişiklikleri yapabilirsiniz:
 
+RLAqmQueueDisc sınıfında CheckConfig metodunu güçlendirin:
+cpp
 
-Debugging Tips
-    Python-C++ Communication:
-        Check logs from both the Python and NS-3 sides to ensure the RL agent and simulation are exchanging data correctly.
-        Use verbose logging for debugging the interface between Python and NS-3.
+Verify
+Copy code
+bool RLAqmQueueDisc::CheckConfig(void)
+{
+    NS_LOG_FUNCTION(this);
+    
+    // Temel QueueDisc kontrolleri
+    if (GetNInternalQueues() == 0)
+    {
+        NS_LOG_ERROR("No internal queue");
+        return false;
+    }
 
-    Unit Testing:
-        Isolate and test the Python DQN independently on a simpler Gym environment before integrating it with NS-3.
-    Simulation Stability:
-        Gradually increase the complexity of your NS-3 simulation to identify potential bottlenecks or issues.
+    // NetDevice kontrolü
+    Ptr<NetDevice> device = GetObject<NetDevice>();
+    if (device == nullptr) {
+        NS_LOG_ERROR("No NetDevice associated with this QueueDisc");
+        
+        // Node üzerinden cihaz arama
+        Ptr<Node> node = GetObject<Node>();
+        if (node) {
+            for (uint32_t i = 0; i < node->GetNDevices(); ++i) {
+                device = node->GetDevice(i);
+                if (device) {
+                    NS_LOG_INFO("Found NetDevice through Node");
+                    break;
+                }
+            }
+        }
+        
+        if (device == nullptr) {
+            NS_LOG_ERROR("Could not find any NetDevice");
+            return false;
+        }
+    }
+    
+    return true;
+}
+Main fonksiyonunda QueueDisc kurulumunu şu şekilde değiştirin:
+cpp
+
+Verify
+Copy code
+// Setup AQM (RLAqmQueueDisc)
+NS_LOG_INFO("Setting up AQM...");
+TrafficControlHelper tcHelper;
+tcHelper.Uninstall(bottleneckDevices);  
+
+// Her bir NetDevice için ayrı QueueDisc oluşturma
+for (uint32_t i = 0; i < bottleneckDevices.GetN(); ++i) {
+    Ptr<NetDevice> device = bottleneckDevices.Get(i);
+    
+    // QueueDisc oluşturma
+    Ptr<RLAqmQueueDisc> queueDisc = CreateObject<RLAqmQueueDisc>();
+    
+    // NetDevice'ı manuel olarak ayarlama
+    queueDisc->SetNetDevice(device);
+    
+    // QueueDisc'e dahili kuyruk ekleme
+    queueDisc->AddInternalQueue(CreateObject<DropTailQueue<QueueDiscItem>>());
+    
+    // QueueDisc'i NetDevice'a bağlama
+    Ptr<Node> node = device->GetNode();
+    node->AggregateObject(queueDisc);
+    
+    NS_LOG_INFO("QueueDisc installed on device " << i);
+}
+GetTypeId metodunda daha fazla kontrol ekleyin:
+cpp
+
+Verify
+Copy code
+TypeId RLAqmQueueDisc::GetTypeId(void)
+{
+    static TypeId tid = TypeId("ns3::RLAqmQueueDisc")
+        .SetParent<QueueDisc>()
+        .SetGroupName("TrafficControl")
+        .AddConstructor<RLAqmQueueDisc>()
+        .AddAttribute("MaxSize", 
+                      "The maximum number of packets accepted by this queue disc.",
+                      QueueSizeValue(QueueSize("100p")),
+                      MakeQueueSizeAccessor(&RLAqmQueueDisc::SetMaxSize,
+                                            &RLAqmQueueDisc::GetMaxSize),
+                      MakeQueueSizeChecker());
+    
+    // Ek kontrol
+    if (!tid.HasConstructor()) {
+        NS_FATAL_ERROR("Failed to create TypeId for RLAqmQueueDisc");
+    }
+    
+    return tid;
+}
+InitializeParams metodunu genişletin:
+cpp
+
+Verify
+Copy code
+void RLAqmQueueDisc::InitializeParams()
+{
+    NS_LOG_FUNCTION(this);
+    
+    // Dahili kuyruk kontrolü
+    if (GetNInternalQueues() == 0)
+    {
+        Ptr<Queue<QueueDiscItem>> queue = CreateObject<DropTailQueue<QueueDiscItem>>();
+        
+        // Kuyruk boyutu ayarlama
+        queue->SetMaxSize(QueueSize("100p"));
+        
+        AddInternalQueue(queue);
+        NS_LOG_INFO("Internal queue initialized for RLAqmQueueDisc.");
+    }
+    
+    // NetDevice kontrolü
+    Ptr<NetDevice> device = GetObject<NetDevice>();
+    if (device == nullptr) {
+        NS_LOG_WARN("No NetDevice associated during initialization");
+    }
+}
+Ek hata ayıklama için main fonksiyonunda:
+cpp
+
+Verify
+Copy code
+// QueueDisc kurulumundan sonra
+for (uint32_t i = 0; i < bottleneckDevices.GetN(); ++i) {
+    Ptr<NetDevice> device = bottleneckDevices.Get(i);
+    Ptr<QueueDisc> queueDisc = device->GetObject<QueueDisc>();
+    
+    if (queueDisc == nullptr) {
+        NS_LOG_ERROR("No QueueDisc found on device " << i);
+    } else {
+        NS_LOG_INFO("QueueDisc found on device " << i);
+    }
+}
+Bu değişiklikler, NetDevice ve QueueDisc ilişkisini daha güçlü bir şekilde kurmaya yardımcı olacaktır. Hala sorun yaşarsanız, tam hata mesajını ve kod yapılandırmanızı paylaşmanız faydalı olabilir.
