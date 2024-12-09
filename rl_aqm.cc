@@ -34,29 +34,32 @@
     class RLAqmQueueDisc : public QueueDisc
     {
     public:
-        static TypeId GetTypeId (void);
-        RLAqmQueueDisc ();
-        ~RLAqmQueueDisc () override;
+        static TypeId GetTypeId(void);
+        RLAqmQueueDisc();
+        ~RLAqmQueueDisc() override;
 
-        // Kuyruk disiplini metodları
+        // QueueDisc methods
         bool DoEnqueue(Ptr<QueueDiscItem> item) override;
-        Ptr<QueueDiscItem> DoDequeue(void)  override;
-        Ptr<const QueueDiscItem> DoPeek(void) const; // const eklendi ve dönüş türü değiştirildi
-        bool CheckConfig (void) override;
-        void InitializeParams (void) override;
-        bool DoDrop(Ptr<QueueDiscItem> item) ;
-        void RLAqmQueueDisc::SimulatorCallback();
-        double RLAqmQueueDisc::CalculateQueueDelay();
-        double RLAqmQueueDisc::CalculateLinkUtilization();
+        Ptr<QueueDiscItem> DoDequeue(void) override;
+        Ptr<const QueueDiscItem> DoPeek(void) const; // const added
+        bool CheckConfig(void) override;
+        void InitializeParams(void) override;
+        bool DoDrop(Ptr<QueueDiscItem> item);
 
-        // ns3-ai entegrasyon metodları
-        virtual void GetState (RLAqmEnv* env);
-        virtual void SetAction (uint32_t action);
+        // ns3-ai integration methods
+        virtual void GetState(RLAqmEnv* env);
+        virtual void SetAction(uint32_t action);
+
+        // Timer callback
+        void SimulatorCallback();
+        double CalculateQueueDelay();
+        double CalculateLinkUtilization();
 
     private:
         Ptr<RLAqmEnv> m_env;
         double m_dropProbability;
     };
+
 
     // RLAqmQueueDisc metodlarını tanımlayın
     TypeId 
@@ -148,53 +151,61 @@
      }
     }
 
-
     double RLAqmQueueDisc::CalculateQueueDelay() {
         NS_LOG_FUNCTION(this);
-
+        
         // Get the current queue size in bytes
         uint32_t currentQueueSize = GetInternalQueue(0)->GetNBytes();
-
-        // Retrieve the link bandwidth (e.g., bottleneck link bandwidth in bits per second)
+        
+        // Retrieve the link bandwidth from the associated NetDevice
+        Ptr<NetDevice> device = GetObject<NetDevice>();
+        if (device == nullptr) {
+            NS_LOG_WARN("NetDevice is null, queue delay cannot be calculated.");
+            return 0.0;  // Handle the case where the NetDevice is not available
+        }
+    
+        // Get the DataRate attribute from the NetDevice
         DataRateValue dataRateValue;
-        GetAttribute("DataRate", dataRateValue);
+        device->GetAttribute("DataRate", dataRateValue);
         DataRate linkBandwidth = dataRateValue.Get();
-
+    
         if (linkBandwidth.GetBitRate() == 0) {
             NS_LOG_WARN("Link bandwidth is zero, queue delay cannot be calculated.");
-            return 0.0;
+            return 0.0;  // Make sure to return something
         }
-
+    
         // Calculate queue delay in seconds
         double queueDelay = static_cast<double>(currentQueueSize) * 8 / linkBandwidth.GetBitRate();
-        return queueDelay;
+        return queueDelay;  // Return the calculated value
     }
-
-
+    
     double RLAqmQueueDisc::CalculateLinkUtilization() {
         NS_LOG_FUNCTION(this);
-
-        // Retrieve the link bandwidth (e.g., bottleneck link bandwidth in bits per second)
+    
+        // Retrieve the link bandwidth from the associated NetDevice
+        Ptr<NetDevice> device = GetObject<NetDevice>();
+        if (device == nullptr) {
+            NS_LOG_WARN("NetDevice is null, utilization cannot be calculated.");
+            return 0.0;  // Handle the case where the NetDevice is not available
+        }
+    
+        // Get the DataRate attribute from the NetDevice
         DataRateValue dataRateValue;
-        GetAttribute("DataRate", dataRateValue);
+        device->GetAttribute("DataRate", dataRateValue);
         DataRate linkBandwidth = dataRateValue.Get();
-
+    
         if (linkBandwidth.GetBitRate() == 0) {
             NS_LOG_WARN("Link bandwidth is zero, utilization cannot be calculated.");
             return 0.0;
         }
-
-        // Get the transmitted bytes since the last observation
-        uint64_t transmittedBytes = GetInternalQueue(0)->GetTotalEnqueuedBytes();
-
-        // Calculate utilization (0-1)
-        double utilization = static_cast<double>(transmittedBytes * 8) / linkBandwidth.GetBitRate();
+    
+        // Get the total number of bytes enqueued in the queue
+        uint32_t totalBytes = GetInternalQueue(0)->GetNBytes(); // Get the total bytes in the queue
+    
+        // Calculate utilization (0-1) using the total bytes in the queue and link bandwidth
+        double utilization = static_cast<double>(totalBytes * 8) / linkBandwidth.GetBitRate();  // Convert bytes to bits
         return utilization;
     }
-
-
-
-
 
 
 
@@ -214,8 +225,9 @@
         OpenGymInterface::Get()->NotifyCurrentState();
 
         // Schedule the next callback at 20 ms
-        Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, this);
+        Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, this); // Note the "this"
     }
+
 
 int main(int argc, char* argv[]) {
     // Log Level
@@ -308,7 +320,8 @@ int main(int argc, char* argv[]) {
         tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
         std::cout << "aqm kuruldu\n";
 
-        tcHelper.Install(bottleneckDevices);
+       
+        Ptr<RLAqmQueueDisc> queueDisc = DynamicCast<RLAqmQueueDisc>(tcHelper.Install(bottleneckDevices).Get(0));
         
         // FlowMonitor kurulumu
         FlowMonitorHelper flowmon;
@@ -316,7 +329,9 @@ int main(int argc, char* argv[]) {
         std::cout << "flow monitor kuruldu\n ";
 
         // Simülasyonu çalıştırma
-        Simulator::Schedule(Seconds(0.02), &RLAqmQueueDisc::SimulatorCallback, bottleneckDevices.Get(0));
+        Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, queueDisc);
+
+
 
 
 
