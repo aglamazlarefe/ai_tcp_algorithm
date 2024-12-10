@@ -27,7 +27,7 @@
     static const std::string bottleneckBandwidth = "10Mbps";
     static const std::string accessDelay = "2ms";
     static const std::string bottleneckDelay = "10ms";
-    static const double simulationTime =50.0; // Simulation time in seconds
+    static const double simulationTime =5.0; // Simulation time in seconds
 
 
 
@@ -68,14 +68,18 @@
         static TypeId tid = TypeId ("ns3::RLAqmQueueDisc")
             .SetParent<QueueDisc> ()
             .SetGroupName ("TrafficControl")
-            .AddConstructor<RLAqmQueueDisc> ();
+            .AddConstructor<RLAqmQueueDisc>()
+            .AddAttribute("MaxSize", 
+                          "The maximum number of packets accepted by this queue disc.",
+                          QueueSizeValue(QueueSize("100p")),
+                          MakeQueueSizeAccessor(&RLAqmQueueDisc::SetMaxSize,
+                                                &RLAqmQueueDisc::GetMaxSize),
+                          MakeQueueSizeChecker());
         return tid;
-    }
-
-    RLAqmQueueDisc::RLAqmQueueDisc ()
-    {
-        NS_LOG_FUNCTION (this);
-        m_env = CreateObject<RLAqmEnv> ();
+     }
+    RLAqmQueueDisc::RLAqmQueueDisc() : m_dropProbability(0.0) {
+        NS_LOG_FUNCTION(this);
+        m_env = CreateObject<RLAqmEnv>();
     }
 
     RLAqmQueueDisc::~RLAqmQueueDisc ()
@@ -87,10 +91,12 @@
         NS_LOG_FUNCTION(this << item);
         bool succeeded = GetInternalQueue(0)->Enqueue(item);
         if (succeeded) {
-            // Update state on enqueue
-            double queueDelay = CalculateQueueDelay(); 
-            double linkUtilization = CalculateLinkUtilization(); 
+            NS_LOG_INFO("Packet enqueued. Updating state.");
+            double queueDelay = CalculateQueueDelay();
+            double linkUtilization = CalculateLinkUtilization();
             m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
+        } else {
+            NS_LOG_ERROR("Failed to enqueue packet.");
         }
         return succeeded;
     }
@@ -101,10 +107,15 @@
         NS_LOG_FUNCTION(this);
         Ptr<QueueDiscItem> item = GetInternalQueue(0)->Dequeue();
         if (item) {
-            // Update state on dequeue
+            NS_LOG_INFO("Packet dequeued. Updating state.");
             double queueDelay = CalculateQueueDelay();
             double linkUtilization = CalculateLinkUtilization();
             m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
+            NS_LOG_INFO("State set: QueueDelay=" << queueDelay << ", LinkUtilization=" << linkUtilization << ", DropProbability=" << m_dropProbability);
+            
+            
+        } else {    
+            NS_LOG_WARN("Queue empty. Cannot dequeue.");
         }
         return item;
     }
@@ -135,20 +146,64 @@
         // Eylemi uygulama mantığını buraya ekleyin
     }
 
-    bool RLAqmQueueDisc::CheckConfig (void)
+        bool RLAqmQueueDisc::CheckConfig(void)
     {
-        NS_LOG_FUNCTION (this);
-        // Yapılandırma kontrolü için gerekli işlemleri burada yapabilirsiniz.
+        NS_LOG_FUNCTION(this);
+
+        // NetDevice'ı alma
+        Ptr<NetDevice> device = GetObject<NetDevice>();
+        if (device == nullptr) {
+            NS_LOG_WARN("No NetDevice found. Attempting to find one.");
+
+            // Node üzerinden NetDevice arama
+            Ptr<Node> node = GetObject<Node>();
+            if (node) {
+                for (uint32_t i = 0; i < node->GetNDevices(); ++i) {
+                    device = node->GetDevice(i);
+                    if (device) {
+                        NS_LOG_INFO("Found NetDevice through Node");
+                        // NetDevice'ı bu QueueDisc'e ekle
+                        AggregateObject(device);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (GetNInternalQueues() == 0) {
+            AddInternalQueue(CreateObject<DropTailQueue<QueueDiscItem>>());
+        }
+
         return true;
     }
 
-    void RLAqmQueueDisc::InitializeParams() {
-    NS_LOG_FUNCTION(this);
-     if (GetNInternalQueues() == 0) {
-         // Add a default DropTail queue
-         AddInternalQueue(CreateObject<DropTailQueue<QueueDiscItem>>());
-         NS_LOG_INFO("Internal queue initialized for RLAqmQueueDisc.");
-     }
+        void RLAqmQueueDisc::InitializeParams()
+    {
+        NS_LOG_FUNCTION(this);
+
+        // NetDevice'ı alma
+        Ptr<NetDevice> device = GetObject<NetDevice>();
+        if (device == nullptr) {
+            NS_LOG_WARN("No NetDevice found during initialization.");
+
+            // Node üzerinden NetDevice arama
+            Ptr<Node> node = GetObject<Node>();
+            if (node) {
+                for (uint32_t i = 0; i < node->GetNDevices(); ++i) {
+                    device = node->GetDevice(i);
+                    if (device) {
+                        NS_LOG_INFO("Found NetDevice through Node during initialization");
+                        // NetDevice'ı bu QueueDisc'e ekle
+                        AggregateObject(device);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (GetNInternalQueues() == 0) {
+            AddInternalQueue(CreateObject<DropTailQueue<QueueDiscItem>>());
+        }
     }
 
     double RLAqmQueueDisc::CalculateQueueDelay() {
@@ -156,14 +211,51 @@
         
         // Get the current queue size in bytes
         uint32_t currentQueueSize = GetInternalQueue(0)->GetNBytes();
-        
-        // Retrieve the link bandwidth from the associated NetDevice
-        Ptr<NetDevice> device = GetObject<NetDevice>();
-        if (device == nullptr) {
-            NS_LOG_WARN("NetDevice is null, queue delay cannot be calculated.");
-            return 0.0;  // Handle the case where the NetDevice is not available
+                   
+        // NetDevice'ı alma
+        NS_LOG_FUNCTION(this);
+    
+        // Tüm olası NetDevice bulma yöntemlerini dene
+        Ptr<NetDevice> device = nullptr;
+    
+        // 1. GetObject ile deneme
+        device = GetObject<NetDevice>();
+        if (!device) {
+            NS_LOG_WARN("NetDevice not found with GetObject");
         }
     
+        // 2. Node üzerinden deneme
+        if (!device) {
+            Ptr<Node> node = GetObject<Node>();
+            if (node) {
+                for (uint32_t i = 0; i < node->GetNDevices(); ++i) {
+                    device = node->GetDevice(i);
+                    if (device) {
+                        NS_LOG_INFO("NetDevice found through Node");
+                        break;
+                    }
+                }
+            }
+        }
+    
+        // 3. Context bilgisini kullanma
+        if (!device) {
+            Ptr<Object> context = GetObject<Object>();
+            if (context) {
+                device = context->GetObject<NetDevice>();
+                if (device) {
+                    NS_LOG_INFO("NetDevice found through context");
+                }
+            }
+        }
+    
+        if (!device) {
+            NS_LOG_ERROR("Unable to find NetDevice through any method");
+            return 0.0;
+        }
+    
+        // NetDevice bilgilerini yazdırma
+        NS_LOG_INFO("Found NetDevice: " << device);
         // Get the DataRate attribute from the NetDevice
         DataRateValue dataRateValue;
         device->GetAttribute("DataRate", dataRateValue);
@@ -220,6 +312,8 @@
 
         // Update environment state and notify
         m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
+        NS_LOG_INFO("State set: QueueDelay=" << queueDelay << ", LinkUtilization=" << linkUtilization << ", DropProbability=" << m_dropProbability);
+
 
         // Notify OpenGym about the current state
         OpenGymInterface::Get()->NotifyCurrentState();
@@ -232,8 +326,7 @@
 int main(int argc, char* argv[]) {
     // Log Level
         
-        LogComponentEnable("RLAqmEnv", LOG_LEVEL_ALL);
-
+        LogComponentEnable("RLAqmSimulation", LOG_LEVEL_ALL);
 
         NS_LOG_INFO("Creating nodes...");
         NodeContainer leftNodes, rightNodes, routers;
@@ -304,13 +397,13 @@ int main(int argc, char* argv[]) {
             PacketSinkHelper sink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), 9));
             sinkApps.Add(sink.Install(rightNodes.Get(i)));
         }
-        /*
+        
         sourceApps.Start(Seconds(1.0));
         sourceApps.Stop(Seconds(simulationTime));
 
         sinkApps.Start(Seconds(1.0));
         sinkApps.Stop(Seconds(simulationTime));
-        */
+        
         
 
         // AQM (RLAqmQueueDisc) kurulumunu yapma
@@ -320,18 +413,27 @@ int main(int argc, char* argv[]) {
         tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
         std::cout << "aqm kuruldu\n";
 
+        // QueueDisc'i yükleme ve NetDevice'ı manuel olarak ayarlama
+        QueueDiscContainer queueDiscs = tcHelper.Install(bottleneckDevices);
+        Ptr<RLAqmQueueDisc> queueDisc = DynamicCast<RLAqmQueueDisc>(queueDiscs.Get(0));
+
+        if (queueDisc) {
+            // NetDevice'ı manuel olarak ayarlama
+            Ptr<NetDevice> device = bottleneckDevices.Get(0);
+            queueDisc->AggregateObject(device);
+
+            // Simülasyonu zamanlama
+            Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, queueDisc);
+        } else {
+            NS_LOG_ERROR("Failed to get RLAqmQueueDisc");
+        }
+
        
-        Ptr<RLAqmQueueDisc> queueDisc = DynamicCast<RLAqmQueueDisc>(tcHelper.Install(bottleneckDevices).Get(0));
         
         // FlowMonitor kurulumu
         FlowMonitorHelper flowmon;
         Ptr<FlowMonitor> monitor = flowmon.InstallAll();
         std::cout << "flow monitor kuruldu\n ";
-
-        // Simülasyonu çalıştırma
-        Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, queueDisc);
-
-
 
 
 
