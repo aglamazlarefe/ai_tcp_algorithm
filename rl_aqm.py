@@ -1,5 +1,5 @@
 import logging
-import ns3ai_gym_env
+import ns3ai_gym_env 
 import gymnasium as gym
 import numpy as np
 import torch
@@ -101,7 +101,7 @@ class RlAqmAgent:
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
 # Ortam başlatma
-env = gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm", ns3Path="/home/aglamazlarefe/ns-allinone-3.43/ns-3.43")
+env = gym.make("ns3ai_gym_env/Ns3-v0", targetName="rl-aqm", ns3Path="/home/aglamazlarefe/ns-allinone-3.38/ns-3.38")
 print(env.observation_space)  # Gözlem alanının boyutlarını yazdır
 print(env.action_space)       # Aksiyon alanının boyutlarını yazdır
 
