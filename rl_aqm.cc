@@ -406,51 +406,57 @@ int main(int argc, char* argv[]) {
         
         
 
-        // AQM (RLAqmQueueDisc) kurulumunu yapma
+       // AQM (RLAqmQueueDisc) kurulumunu yapma
         NS_LOG_INFO("Setting up AQM...");
         TrafficControlHelper tcHelper;
         tcHelper.Uninstall(bottleneckDevices);
         tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
-        std::cout << "aqm kuruldu\n";
-
-        // QueueDisc'i yükleme ve NetDevice'ı manuel olarak ayarlama
+        std::cout << "AQM kuruldu\n";
+        
+        // QueueDisc'i yükleme
         QueueDiscContainer queueDiscs = tcHelper.Install(bottleneckDevices);
-        Ptr<RLAqmQueueDisc> queueDisc = DynamicCast<RLAqmQueueDisc>(queueDiscs.Get(0));
-
-        if (queueDisc) {
-            // NetDevice'ı manuel olarak ayarlama
-            Ptr<NetDevice> device = bottleneckDevices.Get(0);
-            queueDisc->AggregateObject(device);
-
-            // Simülasyonu zamanlama
+        
+        for (uint32_t i = 0; i < bottleneckDevices.GetN(); ++i) {
+            Ptr<NetDevice> netDevice = bottleneckDevices.Get(i);
+            Ptr<QueueDisc> queueDisc = queueDiscs.Get(i);
+        
+            // NetDevice'in bir PointToPointNetDevice olduğundan emin olun
+            Ptr<PointToPointNetDevice> p2pDevice = DynamicCast<PointToPointNetDevice>(netDevice);
+            if (p2pDevice) {
+                Ptr<Queue<Packet>> queue = p2pDevice->GetQueue();
+                if (queue) {
+                    NS_LOG_INFO("Queue retrieved successfully.");
+                    // Kuyruk ile işlem yapabilirsiniz
+                } else {
+                    NS_LOG_WARN("Queue not found.");
+                }
+            } else {
+                NS_LOG_WARN("NetDevice is not a PointToPointNetDevice.");
+            }
+        
+            // Simülasyonu zamanlama (örneğin, AQM için bir callback)
             Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, queueDisc);
-        } else {
-            NS_LOG_ERROR("Failed to get RLAqmQueueDisc");
         }
-
-       
         
         // FlowMonitor kurulumu
         FlowMonitorHelper flowmon;
         Ptr<FlowMonitor> monitor = flowmon.InstallAll();
-        std::cout << "flow monitor kuruldu\n ";
-
-
-
+        std::cout << "Flow monitor kuruldu\n";
+        
+        // Simülasyonu başlatma
         NS_LOG_INFO("Starting simulation...");
         Simulator::Stop(Seconds(simulationTime));
-        Simulator::Run(); 
+        Simulator::Run();
         NS_LOG_INFO("Simulation finished.");
-        std::cout << "run simulation\n";
-
-        // Simülasyon sonuçlarını analiz edin
+        std::cout << "Run simulation\n";
+        
+        // Simülasyon sonuçlarını analiz etme
         monitor->CheckForLostPackets();
         monitor->SerializeToXmlFile("flow-monitor.xml", true, true);
-
-
-
+        
         Simulator::Destroy();
-        std::cout << "destroy simulation\n";
+        std::cout << "Destroy simulation\n";
+        
 
 
         return 0;
