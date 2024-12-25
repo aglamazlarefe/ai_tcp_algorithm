@@ -206,24 +206,22 @@
         }
     }
 
-    double RLAqmQueueDisc::CalculateQueueDelay() {
-    //NS_LOG_FUNCTION(this);
 
-    // Kuyruğun boyutunu alın
+double RLAqmQueueDisc::CalculateQueueDelay() {
+    // Kuyruğun boyutunu alın (byte cinsinden)
     uint32_t currentQueueSize = GetInternalQueue(0)->GetNBytes();
 
-    // İlişkili NetDevice'ı alın
-    Ptr<NetDevice> device = GetObject<NetDevice>();
-    if (!device) {
-        NS_LOG_ERROR("NetDevice not found! Make sure to aggregate the NetDevice with the QueueDisc.");
+    // NetDevice'ı alın
+    Ptr<NetDevice> netDevice = GetObject<NetDevice>();
+    if (!netDevice) {
+        NS_LOG_ERROR("NetDevice not found! Ensure proper configuration.");
         return 0.0;
     }
 
-    // NetDevice'den DataRate alın
+    // DataRate özniteliğini alın
     DataRateValue dataRateValue;
-    device->GetAttribute("DataRate", dataRateValue);
-    if (dataRateValue.Get().GetBitRate() == 0) {
-        NS_LOG_ERROR("Failed to retrieve valid DataRate from NetDevice.");
+    if (!netDevice->GetAttributeFailSafe("DataRate", dataRateValue)) {
+        NS_LOG_ERROR("Failed to retrieve DataRate attribute from NetDevice.");
         return 0.0;
     }
 
@@ -238,6 +236,8 @@
     NS_LOG_INFO("Queue delay calculated: " << queueDelay << " seconds.");
     return queueDelay;
 }
+
+
 
     
     double RLAqmQueueDisc::CalculateLinkUtilization() {
