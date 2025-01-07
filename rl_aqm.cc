@@ -206,71 +206,47 @@
         }
     }
 
-    double RLAqmQueueDisc::CalculateQueueDelay() {
-        NS_LOG_FUNCTION(this);
-        
-        // Get the current queue size in bytes
-        uint32_t currentQueueSize = GetInternalQueue(0)->GetNBytes();
-                   
-        // NetDevice'ı alma
-        NS_LOG_FUNCTION(this);
+        double CalculateQueueDelay(Ptr<QueueDisc> queueDisc) {
+        // Kuyruk boyutu bilgisini al
+        uint32_t currentQueueSize = queueDisc->GetNPackets();
     
-        // Tüm olası NetDevice bulma yöntemlerini dene
-        Ptr<NetDevice> device = nullptr;
+        // NetDeviceQueueInterface aracılığıyla NetDevice'e erişim
+        Ptr<NetDeviceQueueInterface> netDeviceQueueInterface = queueDisc->GetNetDeviceQueueInterface();
+        NS_ASSERT_MSG(netDeviceQueueInterface, "NetDeviceQueueInterface bulunamadı!");
     
-        // 1. GetObject ile deneme
-        device = GetObject<NetDevice>();
-        if (!device) {
-            NS_LOG_WARN("NetDevice not found with GetObject");
+        // NetDevice'i al
+        Ptr<NetDevice> netDevice = netDeviceQueueInterface->GetObject<NetDevice>();
+        NS_ASSERT_MSG(netDevice, "NetDevice bulunamadı!");
+    
+        // Veri hızı için başlangıç değeri
+        double linkDataRate = 0.0;
+    
+        // Eğer cihaz PointToPointNetDevice ise, kanaldan veri hızını al
+        Ptr<PointToPointNetDevice> p2pDevice = netDevice->GetObject<PointToPointNetDevice>();
+        if (p2pDevice) {
+            Ptr<PointToPointChannel> channel = p2pDevice->GetChannel()->GetObject<PointToPointChannel>();
+            NS_ASSERT_MSG(channel, "PointToPointChannel bulunamadı!");
+            linkDataRate = channel->GetDataRate().GetBitRate();  // Kanal veri hızını al
+        } else {
+            // Diğer NetDevice türleri için tahmini bir veri hızı hesapla
+            linkDataRate = EstimateAdaptiveDataRate(netDevice);
         }
     
-        // 2. Node üzerinden deneme
-        if (!device) {
-            Ptr<Node> node = GetObject<Node>();
-            if (node) {
-                for (uint32_t i = 0; i < node->GetNDevices(); ++i) {
-                    device = node->GetDevice(i);
-                    if (device) {
-                        NS_LOG_INFO("NetDevice found through Node");
-                        break;
-                    }
-                }
-            }
-        }
+        // Veri hızı doğrulama
+        NS_ASSERT_MSG(linkDataRate > 0.0, "Bağlantı hızı bilinmiyor veya sıfır!");
     
-        // 3. Context bilgisini kullanma
-        if (!device) {
-            Ptr<Object> context = GetObject<Object>();
-            if (context) {
-                device = context->GetObject<NetDevice>();
-                if (device) {
-                    NS_LOG_INFO("NetDevice found through context");
-                }
-            }
-        }
+        // Kuyruk gecikmesini hesapla (saniye cinsinden)
+        double queueDelay = (static_cast<double>(currentQueueSize) * 8) / linkDataRate;
     
-        if (!device) {
-            NS_LOG_ERROR("Unable to find NetDevice through any method");
-            return 0.0;
-        }
-    
-        // NetDevice bilgilerini yazdırma
-        NS_LOG_INFO("Found NetDevice: " << device);
-        // Get the DataRate attribute from the NetDevice
-        DataRateValue dataRateValue;
-        device->GetAttribute("DataRate", dataRateValue);
-        DataRate linkBandwidth = dataRateValue.Get();
-    
-        if (linkBandwidth.GetBitRate() == 0) {
-            NS_LOG_WARN("Link bandwidth is zero, queue delay cannot be calculated.");
-            return 0.0;  // Make sure to return something
-        }
-    
-        // Calculate queue delay in seconds
-        double queueDelay = static_cast<double>(currentQueueSize) * 8 / linkBandwidth.GetBitRate();
-        return queueDelay;  // Return the calculated value
+        // Milisaniye cinsinden geri döndür
+        return queueDelay * 1000;  
     }
     
+    // Adaptif hız tahmini fonksiyonu
+    double EstimateAdaptiveDataRate(Ptr<NetDevice> device) {
+        // WiFi veya LTE gibi adaptif bağlantılar için varsayılan bir hız
+        return 54000000.0; // Örnek: 54 Mbps (WiFi varsayılan değeri)
+    }   
     double RLAqmQueueDisc::CalculateLinkUtilization() {
         NS_LOG_FUNCTION(this);
     
