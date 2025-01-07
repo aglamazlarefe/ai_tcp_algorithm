@@ -78,20 +78,20 @@
         return tid;
      }
     RLAqmQueueDisc::RLAqmQueueDisc() : m_dropProbability(0.0) {
-        NS_LOG_FUNCTION(this);
+        //NS_LOG_FUNCTION(this);
         m_env = CreateObject<RLAqmEnv>();
     }
 
     RLAqmQueueDisc::~RLAqmQueueDisc ()
     {
-        NS_LOG_FUNCTION (this);
+       // NS_LOG_FUNCTION (this);
     }
 
     bool RLAqmQueueDisc::DoEnqueue(Ptr<QueueDiscItem> item) {
-        NS_LOG_FUNCTION(this << item);
+        //NS_LOG_FUNCTION(this << item);
         bool succeeded = GetInternalQueue(0)->Enqueue(item);
         if (succeeded) {
-            NS_LOG_INFO("Packet enqueued. Updating state.");
+            //NS_LOG_INFO("Packet enqueued. Updating state.");
             double queueDelay = CalculateQueueDelay();
             double linkUtilization = CalculateLinkUtilization();
             m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
@@ -104,14 +104,14 @@
     NS_OBJECT_ENSURE_REGISTERED(RLAqmQueueDisc);
 
     Ptr<QueueDiscItem> RLAqmQueueDisc::DoDequeue() {
-        NS_LOG_FUNCTION(this);
+        //NS_LOG_FUNCTION(this);
         Ptr<QueueDiscItem> item = GetInternalQueue(0)->Dequeue();
         if (item) {
-            NS_LOG_INFO("Packet dequeued. Updating state.");
+            //NS_LOG_INFO("Packet dequeued. Updating state.");
             double queueDelay = CalculateQueueDelay();
             double linkUtilization = CalculateLinkUtilization();
             m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
-            NS_LOG_INFO("State set: QueueDelay=" << queueDelay << ", LinkUtilization=" << linkUtilization << ", DropProbability=" << m_dropProbability);
+            //NS_LOG_INFO("State set: QueueDelay=" << queueDelay << ", LinkUtilization=" << linkUtilization << ", DropProbability=" << m_dropProbability);
             
             
         } else {    
@@ -122,7 +122,7 @@
     Ptr<const QueueDiscItem>
     RLAqmQueueDisc::DoPeek(void) const 
     {
-        NS_LOG_FUNCTION(this);
+        //NS_LOG_FUNCTION(this);
         Ptr<const QueueDiscItem> item = GetInternalQueue(0)->Peek();
         return item;
     }
@@ -142,13 +142,13 @@
 
     void RLAqmQueueDisc::SetAction(uint32_t action)
     {
-        NS_LOG_FUNCTION(this << action);
+       // NS_LOG_FUNCTION(this << action);
         // Eylemi uygulama mantığını buraya ekleyin
     }
 
         bool RLAqmQueueDisc::CheckConfig(void)
     {
-        NS_LOG_FUNCTION(this);
+       // NS_LOG_FUNCTION(this);
 
         // NetDevice'ı alma
         Ptr<NetDevice> device = GetObject<NetDevice>();
@@ -178,8 +178,8 @@
     }
 
         void RLAqmQueueDisc::InitializeParams()
-    {
-        NS_LOG_FUNCTION(this);
+        {
+       // NS_LOG_FUNCTION(this);
 
         // NetDevice'ı alma
         Ptr<NetDevice> device = GetObject<NetDevice>();
@@ -241,6 +241,28 @@
         // Milisaniye cinsinden geri döndür
         return queueDelay * 1000;  
     }
+
+    // DataRate özniteliğini alın
+    DataRateValue dataRateValue;
+    if (!netDevice->GetAttributeFailSafe("DataRate", dataRateValue)) {
+        NS_LOG_ERROR("Failed to retrieve DataRate attribute from NetDevice.");
+        return 0.0;
+    }
+
+    DataRate linkBandwidth = dataRateValue.Get();
+    if (linkBandwidth.GetBitRate() == 0) {
+        NS_LOG_WARN("Link bandwidth is zero; queue delay cannot be calculated.");
+        return 0.0;
+    }
+
+    // Kuyruk gecikmesini hesapla (saniye cinsinden)
+    double queueDelay = static_cast<double>(currentQueueSize) * 8 / linkBandwidth.GetBitRate();
+    NS_LOG_INFO("Queue delay calculated: " << queueDelay << " seconds.");
+    return queueDelay;
+}
+
+
+
     
     // Adaptif hız tahmini fonksiyonu
     double EstimateAdaptiveDataRate(Ptr<NetDevice> device) {
@@ -278,7 +300,7 @@
 
 
     void RLAqmQueueDisc::SimulatorCallback() {
-        NS_LOG_INFO("Simulator callback invoked.");
+       
 
         // Calculate Queue Delay
         double queueDelay = CalculateQueueDelay(); // Implement this function to compute queue delay.
@@ -288,7 +310,7 @@
 
         // Update environment state and notify
         m_env->SetState(queueDelay, linkUtilization, m_dropProbability);
-        NS_LOG_INFO("State set: QueueDelay=" << queueDelay << ", LinkUtilization=" << linkUtilization << ", DropProbability=" << m_dropProbability);
+        //NS_LOG_INFO("State set: QueueDelay=" << queueDelay << ", LinkUtilization=" << linkUtilization << ", DropProbability=" << m_dropProbability);
 
 
         // Notify OpenGym about the current state
@@ -302,132 +324,102 @@
 int main(int argc, char* argv[]) {
     // Log Level
         
-        LogComponentEnable("RLAqmSimulation", LOG_LEVEL_ALL);
+    LogComponentEnable("RLAqmSimulation", LOG_LEVEL_ALL);
+    
+            
+    // Point-to-Point Helpers
+    PointToPointHelper accessLink;
+    accessLink.SetDeviceAttribute("DataRate", StringValue(accessBandwidth));
+    accessLink.SetChannelAttribute("Delay", StringValue(accessDelay));
 
-        NS_LOG_INFO("Creating nodes...");
-        NodeContainer leftNodes, rightNodes, routers;
-        leftNodes.Create(nSources);
-        rightNodes.Create(nSinks);
-        routers.Create(2); // Two routers for the bottleneck
+    PointToPointHelper bottleneckLink;
+    bottleneckLink.SetDeviceAttribute("DataRate", StringValue(bottleneckBandwidth));
+    bottleneckLink.SetChannelAttribute("Delay", StringValue(bottleneckDelay));
 
-        NS_LOG_INFO("Creating point-to-point links...");
-        PointToPointHelper accessLink;
-        accessLink.SetDeviceAttribute("DataRate", StringValue(accessBandwidth));
-        accessLink.SetChannelAttribute("Delay", StringValue(accessDelay));
+    // Point-to-Point Dumbbell Topology
+    PointToPointDumbbellHelper dumbbell(nSources, accessLink, nSinks, accessLink, bottleneckLink);
 
-        PointToPointHelper bottleneckLink;
-        bottleneckLink.SetDeviceAttribute("DataRate", StringValue(bottleneckBandwidth));
-        bottleneckLink.SetChannelAttribute("Delay", StringValue(bottleneckDelay));
+    // Install Internet stack on all nodes
+    InternetStackHelper stack;
+    stack.InstallAll();
 
-        NS_LOG_INFO("Installing internet stacks...");
-        InternetStackHelper stack;
-        stack.Install(leftNodes);
-        stack.Install(rightNodes);
-        stack.Install(routers);
+    // Assign IP addresses to the topology
+    dumbbell.AssignIpv4Addresses(
+        Ipv4AddressHelper("10.1.0.0", "255.255.255.0"),
+        Ipv4AddressHelper("10.2.0.0", "255.255.255.0"),
+        Ipv4AddressHelper("10.3.0.0", "255.255.255.0")
+    );
 
-        NS_LOG_INFO("Setting up connections...");
-        // Connecting sources to the left router
-        NetDeviceContainer leftDevices, leftRouterDevices;
-        for (uint32_t i = 0; i < nSources; ++i) {
-            NetDeviceContainer link = accessLink.Install(leftNodes.Get(i), routers.Get(0));
-            leftDevices.Add(link.Get(0));
-            leftRouterDevices.Add(link.Get(1));
-        }
+    // Populate routing tables
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables();
 
-        // Connecting sinks to the right router
-        NetDeviceContainer rightDevices, rightRouterDevices;
-        for (uint32_t i = 0; i < nSinks; ++i) {
-            NetDeviceContainer link = accessLink.Install(rightNodes.Get(i), routers.Get(1));
-            rightDevices.Add(link.Get(0));
-            rightRouterDevices.Add(link.Get(1));
-        }
+    // Traffic Configuration: OnOff traffic from left nodes to right nodes
+    uint16_t port = 9;
+    OnOffHelper onOff("ns3::TcpSocketFactory", Address());
+    onOff.SetAttribute("DataRate", StringValue("10Mbps"));
+    onOff.SetAttribute("PacketSize", UintegerValue(1024));
 
-        // Connecting the two routers (bottleneck link)
-        NetDeviceContainer bottleneckDevices = bottleneckLink.Install(routers);
+    ApplicationContainer sourceApps, sinkApps;
 
-        NS_LOG_INFO("Assigning IP addresses...");
-        Ipv4AddressHelper ipv4;
-        ipv4.SetBase("10.1.1.0", "255.255.255.0");
-        ipv4.Assign(leftDevices);
-        ipv4.Assign(leftRouterDevices);
+    for (uint32_t i = 0; i < nSources; ++i) {
+        AddressValue remoteAddress(InetSocketAddress(dumbbell.GetRightIpv4Address(i), port));
+        onOff.SetAttribute("Remote", remoteAddress);
+        sourceApps.Add(onOff.Install(dumbbell.GetLeft(i)));
+    }
 
-        ipv4.SetBase("10.2.1.0", "255.255.255.0");
-        ipv4.Assign(rightDevices);
-        ipv4.Assign(rightRouterDevices);
+    PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), port));
+    for (uint32_t i = 0; i < nSinks; ++i) {
+        sinkApps.Add(sinkHelper.Install(dumbbell.GetRight(i)));
+    }
 
-        ipv4.SetBase("10.3.1.0", "255.255.255.0");
-        ipv4.Assign(bottleneckDevices);
+    sourceApps.Start(Seconds(1.0));
+    sourceApps.Stop(Seconds(simulationTime));
 
-        Ipv4GlobalRoutingHelper::PopulateRoutingTables();
-
-        NS_LOG_INFO("Setting up traffic...");
-        ApplicationContainer sourceApps, sinkApps;
-        for (uint32_t i = 0; i < nSources; ++i) {
-            BulkSendHelper ftp("ns3::TcpSocketFactory",
-                InetSocketAddress(rightNodes.Get(i)->GetObject<Ipv4>()->GetAddress(1, 0).GetLocal(), 9));
-            ftp.SetAttribute("MaxBytes", UintegerValue(0)); // Unlimited transfer
-            sourceApps.Add(ftp.Install(leftNodes.Get(i)));
-        }
-
-        for (uint32_t i = 0; i < nSinks; ++i) {
-            PacketSinkHelper sink("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), 9));
-            sinkApps.Add(sink.Install(rightNodes.Get(i)));
-        }
-        
-        sourceApps.Start(Seconds(1.0));
-        sourceApps.Stop(Seconds(simulationTime));
-
-        sinkApps.Start(Seconds(1.0));
-        sinkApps.Stop(Seconds(simulationTime));
-        
-        
-
-        // AQM (RLAqmQueueDisc) kurulumunu yapma
-        NS_LOG_INFO("Setting up AQM...");
-        TrafficControlHelper tcHelper;
-        tcHelper.Uninstall(bottleneckDevices);
-        tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
-        std::cout << "aqm kuruldu\n";
-
-        // QueueDisc'i yükleme ve NetDevice'ı manuel olarak ayarlama
-        QueueDiscContainer queueDiscs = tcHelper.Install(bottleneckDevices);
-        Ptr<RLAqmQueueDisc> queueDisc = DynamicCast<RLAqmQueueDisc>(queueDiscs.Get(0));
-
-        if (queueDisc) {
-            // NetDevice'ı manuel olarak ayarlama
-            Ptr<NetDevice> device = bottleneckDevices.Get(0);
-            queueDisc->AggregateObject(device);
-
-            // Simülasyonu zamanlama
-            Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, queueDisc);
-        } else {
-            NS_LOG_ERROR("Failed to get RLAqmQueueDisc");
-        }
-
-       
-        
-        // FlowMonitor kurulumu
-        FlowMonitorHelper flowmon;
-        Ptr<FlowMonitor> monitor = flowmon.InstallAll();
-        std::cout << "flow monitor kuruldu\n ";
+    sinkApps.Start(Seconds(1.0));
+    sinkApps.Stop(Seconds(simulationTime));
 
 
+   // Traffic Control Helper ile QueueDisc'i yükleyin
+    TrafficControlHelper tcHelper;
+    tcHelper.SetRootQueueDisc("ns3::RLAqmQueueDisc");
 
-        NS_LOG_INFO("Starting simulation...");
-        Simulator::Stop(Seconds(simulationTime));
-        Simulator::Run(); 
-        NS_LOG_INFO("Simulation finished.");
-        std::cout << "run simulation\n";
+    // Sol yönlendiricinin cihazına QueueDisc yükleme
+    QueueDiscContainer leftQueueDiscs = tcHelper.Install(dumbbell.GetLeft()->GetDevice(0));
+    Ptr<NetDevice> leftRouterDevice = dumbbell.GetLeft()->GetDevice(0);
+    Ptr<QueueDisc> leftQueueDisc = leftQueueDiscs.Get(0);
+    leftQueueDisc->AggregateObject(leftRouterDevice);
 
-        // Simülasyon sonuçlarını analiz edin
-        monitor->CheckForLostPackets();
-        monitor->SerializeToXmlFile("flow-monitor.xml", true, true);
-
-
-
-        Simulator::Destroy();
-        std::cout << "destroy simulation\n";
+    // Sağ yönlendiricinin cihazına QueueDisc yükleme
+    QueueDiscContainer rightQueueDiscs = tcHelper.Install(dumbbell.GetRight()->GetDevice(0));
+    Ptr<NetDevice> rightRouterDevice = dumbbell.GetRight()->GetDevice(0);
+    Ptr<QueueDisc> rightQueueDisc = rightQueueDiscs.Get(0);
+    rightQueueDisc->AggregateObject(rightRouterDevice);
 
 
-        return 0;
+    // SimulatorCallback planlama
+    Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, DynamicCast<RLAqmQueueDisc>(leftQueueDisc));
+    Simulator::Schedule(MilliSeconds(20), &RLAqmQueueDisc::SimulatorCallback, DynamicCast<RLAqmQueueDisc>(rightQueueDisc));
+
+    // FlowMonitor kurulumu
+    FlowMonitorHelper flowmon;
+    Ptr<FlowMonitor> monitor = flowmon.InstallAll();
+    std::cout << "Flow monitor kuruldu\n";
+    
+    // Simülasyonu başlatma
+    NS_LOG_INFO("Starting simulation...");
+    Simulator::Stop(Seconds(simulationTime));
+    Simulator::Run();
+    NS_LOG_INFO("Simulation finished.");
+    std::cout << "Run simulation\n";
+    
+    // Simülasyon sonuçlarını analiz etme
+    monitor->CheckForLostPackets();
+    monitor->SerializeToXmlFile("flow-monitor.xml", true, true);
+    
+    Simulator::Destroy();
+    std::cout << "Destroy simulation\n";
+    
+
+
+      return 0;
     }
