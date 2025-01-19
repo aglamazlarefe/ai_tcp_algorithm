@@ -1,0 +1,3 @@
+./waf configure --with-python=/usr/bin/python3
+./waf --run "new-tcp --transport_prot=TcpNewReno --flow_monitor=true"
+./waf --run "new-tcp --transport_prot=TcpRlTimeBased"

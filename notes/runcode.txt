@@ -1,4 +1,0 @@
-./ns3 build rl-aqm
-gdb --args build/home/aglamazlarefe/ns-allinone-3.43/ns-3.43/contrib/ai/examples/adaptive-aqm-scheme/ns3.43-rl-aqm-debug
-(gdb) run
-bt
